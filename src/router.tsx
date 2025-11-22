@@ -7,6 +7,7 @@ import { routeTree } from './routeTree.gen'
 export const getRouter = () => {
   return createRouter({
     routeTree,
+    basepath: '/bi-design', // Add this line
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
   })
