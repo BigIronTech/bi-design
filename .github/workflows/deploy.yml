@@ -35,5 +35,5 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist # TanStack Start typically builds to 'dist'
+          publish_dir: ./.output/public # TanStack Start builds to '.output/public'
           publish_branch: gh-pages
