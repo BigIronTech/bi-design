@@ -300,7 +300,7 @@ const VIRTUAL_MODULES = {
 async function loadVirtualModule(id) {
   switch (id) {
     case VIRTUAL_MODULES.startManifest:
-      return await import("./assets/_tanstack-start-manifest_v-BeGbGhiM.js");
+      return await import("./assets/_tanstack-start-manifest_v-Cq56vXSB.js");
     case VIRTUAL_MODULES.serverFnManifest:
       return await import("./assets/_tanstack-start-server-fn-manifest_v-DdFCHtuP.js");
     case VIRTUAL_MODULES.injectedHeadScripts:
@@ -588,7 +588,7 @@ function sanitizeBase(base) {
 }
 const createServerRpc = (functionId, splitImportFn) => {
   if (!baseUrl) {
-    const sanitizedAppBase = sanitizeBase("/");
+    const sanitizedAppBase = sanitizeBase("/bi-design");
     const sanitizedServerBase = sanitizeBase("/_serverFn");
     baseUrl = `${sanitizedAppBase ? `/${sanitizedAppBase}` : ""}/${sanitizedServerBase}/`;
   }
@@ -633,7 +633,7 @@ function getStartResponseHeaders(opts) {
   return headers;
 }
 function createStartHandler(cb) {
-  const APP_BASE = "/";
+  const APP_BASE = "/bi-design";
   const serverFnBase = joinPaths([
     APP_BASE,
     trimPath("/_serverFn"),
@@ -644,7 +644,7 @@ function createStartHandler(cb) {
   let routerEntry = null;
   const getEntries = async () => {
     if (routerEntry === null) {
-      routerEntry = await import("./assets/router-DBza-4kJ.js").then((n) => n.r);
+      routerEntry = await import("./assets/router-CWjXTlHk.js").then((n) => n.r);
     }
     if (startEntry === null) {
       startEntry = await import("./assets/start-B7Xlu2BJ.js");
