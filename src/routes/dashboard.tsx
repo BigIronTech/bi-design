@@ -1016,6 +1016,26 @@ function Dashboard() {
       .length,
   }
 
+  // Status tallies across all tabs
+  const statusTallies = {
+    pending: auctionListings.filter(
+      (l) =>
+        l.auctionStatus === 'Pending' ||
+        l.auctionStatus === 'Queued' ||
+        l.auctionStatus === 'Pending Payment' ||
+        l.auctionStatus === 'Pending Pickup' ||
+        l.auctionStatus === 'Submitted',
+    ).length,
+    needsAttention: auctionListings.filter(
+      (l) => l.auctionStatus === 'Needs Attention',
+    ).length,
+    published: auctionListings.filter(
+      (l) => l.auctionStatus === 'Published' || l.auctionStatus === 'Active',
+    ).length,
+    completed: auctionListings.filter((l) => l.auctionStatus === 'Completed')
+      .length,
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -1120,10 +1140,41 @@ function Dashboard() {
           {/* Auction Listings Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Browse Listings</CardTitle>
-              <CardDescription>
-                View and manage auction listings across all stages
-              </CardDescription>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Browse Listings</CardTitle>
+                  <CardDescription>
+                    View and manage auction listings across all stages
+                  </CardDescription>
+                </div>
+                {/* Status Tallies */}
+                <div className="flex flex-wrap items-center gap-2 justify-end">
+                  <Badge variant="warning" className="gap-1">
+                    Pending
+                    <span className="ml-1 font-semibold">
+                      {statusTallies.pending}
+                    </span>
+                  </Badge>
+                  <Badge variant="destructive" className="gap-1">
+                    Needs Attention
+                    <span className="ml-1 font-semibold">
+                      {statusTallies.needsAttention}
+                    </span>
+                  </Badge>
+                  <Badge variant="information" className="gap-1">
+                    Published
+                    <span className="ml-1 font-semibold">
+                      {statusTallies.published}
+                    </span>
+                  </Badge>
+                  <Badge variant="successful" className="gap-1">
+                    Completed
+                    <span className="ml-1 font-semibold">
+                      {statusTallies.completed}
+                    </span>
+                  </Badge>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -1132,7 +1183,7 @@ function Dashboard() {
                     Pre-Auction
                     <Badge
                       variant="secondary"
-                      className="bg-neutral-300 text-primary-foreground dark:bg-gray-600 dark:text-white"
+                      className="bg-gray-400 text-white dark:bg-gray-600 dark:text-white"
                     >
                       {stats['pre-auction']}
                     </Badge>
@@ -1141,7 +1192,7 @@ function Dashboard() {
                     Live Auction
                     <Badge
                       variant="secondary"
-                      className="bg-neutral-300 text-primary-foreground dark:bg-gray-600 dark:text-white"
+                      className="bg-gray-400 text-white dark:bg-gray-600 dark:text-white"
                     >
                       {stats['live-auction']}
                     </Badge>
@@ -1150,7 +1201,7 @@ function Dashboard() {
                     Post-Auction
                     <Badge
                       variant="secondary"
-                      className="bg-neutral-300 text-primary-foreground dark:bg-gray-600 dark:text-white"
+                      className="bg-gray-400 text-white dark:bg-gray-600 dark:text-white"
                     >
                       {stats['post-auction']}
                     </Badge>
