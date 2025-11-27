@@ -133,6 +133,8 @@ code {
   --brand-sul-complimentary-lt-gray: oklch(0.8825 0.0029 84.56);
   --brand-sul-complimentary-blue: oklch(0.5981 0.0665 254.02);
   --link: 38 92% 50%; /* HSL values for light mode link color */
+  --successful: oklch(0.627 0.194 149.214);
+  --warning: oklab(0.768999 0.0640533 0.176752);
 }
 
 .dark {
@@ -181,6 +183,8 @@ code {
   --brand-sul-complimentary-lt-gray: oklch(0.8825 0.0029 84.56);
   --brand-sul-complimentary-blue: oklch(0.5981 0.0665 254.02);
   --link: 48 96% 89%; /* HSL values for dark mode link color */
+  --successful: oklch(0.627 0.194 149.214);
+  --warning: oklab(0.768999 0.0640533 0.176752);
 }
 
 @theme inline {

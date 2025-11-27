@@ -24,6 +24,14 @@ const badgeVariants = cva(
           'border-transparent bg-blue-200 text-foreground [a&]:hover:bg-blue-300/80',
         archived:
           'border-transparent bg-gray-100 text-muted-foreground [a&]:hover:bg-gray-100/80',
+        successful:
+          'border-transparent bg-[oklch(0.627_0.194_149.214)] text-white [a&]:hover:bg-[oklch(0.627_0.194_149.214)]/80 dark:bg-[oklch(0.627_0.194_149.214)] dark:text-white dark:[a&]:hover:bg-[oklch(0.627_0.194_149.214)]/80',
+        warning:
+          'border-transparent bg-[oklab(0.768999_0.0640533_0.176752)] text-black [a&]:hover:bg-[oklab(0.768999_0.0640533_0.176752)]/80 dark:bg-[oklab(0.768999_0.0640533_0.176752)] dark:text-black dark:[a&]:hover:bg-[oklab(0.768999_0.0640533_0.176752)]/80',
+        neutral:
+          'border-transparent bg-black text-white [a&]:hover:bg-black/80 dark:bg-black dark:text-white dark:[a&]:hover:bg-black/80',
+        information:
+          'border-transparent bg-blue-600 text-white [a&]:hover:bg-blue-600/80 dark:bg-blue-600 dark:text-white dark:[a&]:hover:bg-blue-600/80',
       },
     },
     defaultVariants: {

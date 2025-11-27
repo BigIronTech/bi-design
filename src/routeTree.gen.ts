@@ -20,6 +20,7 @@ import { Route as IdentityRouteImport } from './routes/identity'
 import { Route as FormsRouteImport } from './routes/forms'
 import { Route as FigmaRouteImport } from './routes/figma'
 import { Route as ElementsRouteImport } from './routes/elements'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 
 const VoiceAndToneRoute = VoiceAndToneRouteImport.update({
@@ -77,6 +78,11 @@ const ElementsRoute = ElementsRouteImport.update({
   path: '/elements',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -85,6 +91,7 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
   '/elements': typeof ElementsRoute
   '/figma': typeof FigmaRoute
   '/forms': typeof FormsRoute
@@ -99,6 +106,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
   '/elements': typeof ElementsRoute
   '/figma': typeof FigmaRoute
   '/forms': typeof FormsRoute
@@ -114,6 +122,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
   '/elements': typeof ElementsRoute
   '/figma': typeof FigmaRoute
   '/forms': typeof FormsRoute
@@ -130,6 +139,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/dashboard'
     | '/elements'
     | '/figma'
     | '/forms'
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/dashboard'
     | '/elements'
     | '/figma'
     | '/forms'
@@ -158,6 +169,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/dashboard'
     | '/elements'
     | '/figma'
     | '/forms'
@@ -173,6 +185,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DashboardRoute: typeof DashboardRoute
   ElementsRoute: typeof ElementsRoute
   FigmaRoute: typeof FigmaRoute
   FormsRoute: typeof FormsRoute
@@ -265,6 +278,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ElementsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -277,6 +297,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DashboardRoute: DashboardRoute,
   ElementsRoute: ElementsRoute,
   FigmaRoute: FigmaRoute,
   FormsRoute: FormsRoute,

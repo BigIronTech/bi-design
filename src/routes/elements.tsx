@@ -306,6 +306,10 @@ function App() {
                             <Badge variant="secondary">Secondary</Badge>
                             <Badge variant="outline">Outline</Badge>
                             <Badge variant="destructive">Destructive</Badge>
+                            <Badge variant="information">Information</Badge>
+                            <Badge variant="successful">Successful</Badge>
+                            <Badge variant="warning">Warning</Badge>
+                            <Badge variant="neutral">Neutral</Badge>
                             <Badge variant="location">
                               <FontAwesomeIcon
                                 icon={faLocationDot}

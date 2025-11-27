@@ -70,6 +70,15 @@ const navItems = [
       { id: 'patterns', label: 'Patterns', to: '/patterns' },
     ],
   },
+  {
+    id: 'dashboards',
+    label: 'Dashboards',
+    to: '/dashboard',
+    icon: CirclePlay,
+    subItems: [
+      { id: 'auction-insights', label: 'Auction Insights', to: '/dashboard' },
+    ],
+  },
 ]
 
 const ThemedImage = () => {

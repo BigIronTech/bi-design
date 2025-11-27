@@ -71,7 +71,7 @@ function App() {
             <ButtonToggle />
           </div>
         </header>
-        <main className="container-wrapper flex flex-1 flex-col px-2">
+        <main className="container-wrapper flex flex-1 flex-col px-4">
           <div className="w-full overflow-y-auto min-h-[100vh] flex-1 md:min-h-min lg:py-8 md:px-0 max-w-7xl mx-auto">
             <div className="bg-background mb-8">
               <div className="text-foreground leading-relaxed text-base">
