@@ -30,6 +30,7 @@ import { LoginModal } from '@/components/login-modal'
 import { RegistrationForm } from '@/components/registration-form'
 import { RegistrationModal } from '@/components/registration-modal'
 import { OTPModal } from '@/components/otp-modal'
+import { BidModal } from '@/components/bid-modal'
 
 export const Route = createFileRoute('/forms')({
   component: App,
@@ -93,6 +94,20 @@ function App() {
   const [showLogin, setShowLogin] = useState(false)
   const [showOTP, setShowOTP] = useState(false)
   const [showRegistration, setShowRegistration] = useState(false)
+  const [showBidModal, setShowBidModal] = useState(false)
+
+  // Sample auction item for bid modal demo
+  const sampleAuctionItem = {
+    id: 'AUC-001',
+    title: 'John Deere 8320R Tractor - 2020 Model',
+    currentBid: 145000,
+    startingBid: 125000,
+    bids: 24,
+    endDate: '2025-12-15T18:00:00',
+    category: 'Equipment',
+    seller: 'Johnson Farm Equipment',
+    location: 'Des Moines, IA',
+  }
 
   const handleLogin = (data: any) => {
     console.log('Login data:', data)
@@ -111,6 +126,12 @@ function App() {
     console.log('Registration data:', data)
     // Add your registration logic here
     alert(`Registration submitted for: ${data.email}`)
+  }
+
+  const handleBidSubmit = (bidAmount: number) => {
+    console.log('Bid submitted:', bidAmount)
+    // Add your bid logic here
+    alert(`Bid of $${bidAmount.toLocaleString()} placed successfully!`)
   }
 
   return (
@@ -312,9 +333,20 @@ function App() {
                           <Badge variant="draft">Coming Soon</Badge>
                         </div>
                       </ComponentDemo>
-                      <ComponentDemo title="Bid Input">
+                      <ComponentDemo
+                        title="Bid Modal"
+                        description="Professional auction bidding interface with validation and quick bid options"
+                      >
                         <div className="flex flex-wrap gap-2">
-                          <Badge variant="draft">Coming Soon</Badge>
+                          <Button onClick={() => setShowBidModal(true)}>
+                            Place a Bid
+                          </Button>
+                          <BidModal
+                            isOpen={showBidModal}
+                            onClose={() => setShowBidModal(false)}
+                            item={sampleAuctionItem}
+                            onSubmit={handleBidSubmit}
+                          />
                         </div>
                       </ComponentDemo>
                     </ComponentSection>
