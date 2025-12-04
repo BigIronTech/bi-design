@@ -1,5 +1,8 @@
 import React, { useState } from 'react'
 import { AlertCircle, DollarSign, Gavel, TrendingUp } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -8,12 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 
 interface BidModalProps {
   isOpen: boolean
@@ -98,7 +98,6 @@ export function BidModal({ isOpen, onClose, item, onSubmit }: BidModalProps) {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
     })
@@ -106,13 +105,54 @@ export function BidModal({ isOpen, onClose, item, onSubmit }: BidModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent
+        className="
+          w-full max-w-2xl
+          p-6
+          gap-4
+          overflow-y-auto
+          
+          rounded-none
+          sm:rounded-lg
+          
+          h-auto
+          max-h-[100vh]
+          sm:max-h-[90vh]
+          
+          left-[50%]
+          translate-x-[-50%]
+          
+          bottom-0
+          top-[65px]
+          translate-y-0
+          
+          sm:top-[50%]
+          sm:bottom-auto
+          sm:translate-y-[-50%]
+          
+          data-[state=open]:animate-in 
+          data-[state=closed]:animate-out
+          data-[state=closed]:fade-out-0
+          data-[state=open]:fade-in-0
+          
+          data-[state=closed]:slide-out-to-bottom
+          data-[state=open]:slide-in-from-bottom
+          
+          data-[state=closed]:sm:slide-out-to-top
+          data-[state=open]:sm:slide-in-from-top
+          
+          duration-500
+          sm:duration-700
+          
+          ease-in-out
+          sm:ease-out
+        "
+      >
         <DialogHeader>
           <DialogTitle className="text-2xl flex items-center gap-2">
-            <Gavel className="h-6 w-6 text-primary" />
             Place Your Bid
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-left">
             Review the item details and enter your bid amount
           </DialogDescription>
         </DialogHeader>
@@ -121,12 +161,17 @@ export function BidModal({ isOpen, onClose, item, onSubmit }: BidModalProps) {
           {/* Item Details */}
           <div className="bg-muted/50 rounded-lg p-4 space-y-3">
             <div>
-              <h3 className="font-semibold text-lg">{item.title}</h3>
-              <p className="text-sm text-muted-foreground">{item.id}</p>
+              <h3
+                className="font-semibold text-lg
+              "
+              >
+                {item.title}
+              </h3>
+              {/* <p className="text-sm text-muted-foreground">{item.id}</p> */}
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
+              <div className="hidden lg:block">
                 <Label className="text-xs text-muted-foreground">
                   Category
                 </Label>
@@ -138,7 +183,7 @@ export function BidModal({ isOpen, onClose, item, onSubmit }: BidModalProps) {
                 </Label>
                 <p className="font-medium">{item.location}</p>
               </div>
-              <div>
+              <div className="hidden lg:block">
                 <Label className="text-xs text-muted-foreground">Seller</Label>
                 <p className="font-medium">{item.seller}</p>
               </div>
@@ -154,7 +199,7 @@ export function BidModal({ isOpen, onClose, item, onSubmit }: BidModalProps) {
           <Separator />
 
           {/* Current Bid Information */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-2 lg:gap-4">
             <div className="text-center p-4 bg-muted/30 rounded-lg">
               <Label className="text-xs text-muted-foreground">
                 Starting Bid
@@ -167,7 +212,7 @@ export function BidModal({ isOpen, onClose, item, onSubmit }: BidModalProps) {
               <Label className="text-xs text-muted-foreground">
                 Current Bid
               </Label>
-              <p className="text-lg font-bold mt-1 text-primary">
+              <p className="text-md lg:text-lg font-bold mt-1 text-primary">
                 {item.currentBid > 0
                   ? formatCurrency(item.currentBid)
                   : 'No bids yet'}
@@ -198,7 +243,7 @@ export function BidModal({ isOpen, onClose, item, onSubmit }: BidModalProps) {
                     setBidAmount(e.target.value)
                     setError('')
                   }}
-                  className="pl-10 text-lg font-semibold h-12"
+                  className="pl-9"
                   autoFocus
                 />
               </div>
@@ -237,10 +282,9 @@ export function BidModal({ isOpen, onClose, item, onSubmit }: BidModalProps) {
             )}
 
             {/* Info Alert */}
-            <Alert>
-              <TrendingUp className="h-4 w-4" />
-              <AlertDescription className="text-xs">
-                <strong>Bidding Tips:</strong> Your bid is binding. Make sure
+            <Alert className="p-4 lg:p-6">
+              <AlertDescription className="text-xs leading-tight">
+                <strong>Bidding Tips:</strong> A bid is binding. Make sure
                 you're ready to purchase if you win. Bids cannot be retracted
                 once placed.
               </AlertDescription>
@@ -263,10 +307,7 @@ export function BidModal({ isOpen, onClose, item, onSubmit }: BidModalProps) {
                 Placing Bid...
               </>
             ) : (
-              <>
-                <Gavel className="h-4 w-4 mr-2" />
-                Place Bid
-              </>
+              <>Place Bid</>
             )}
           </Button>
         </DialogFooter>
