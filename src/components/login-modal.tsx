@@ -136,7 +136,7 @@ export function LoginModal({ open, onOpenChange, onLogin }: LoginModalProps) {
             Don't have an account?{' '}
             <button
               type="button"
-              className="text-primary underline-offset-4 hover:underline"
+              className="text-blue-600 underline-offset-4 hover:underline cursor-pointer active:outline-none active:ring-2 active:ring-blue-500 active:ring-offset-2 active:ring-offset-blue-50"
               onClick={() => onOpenChange(false)}
             >
               Sign up

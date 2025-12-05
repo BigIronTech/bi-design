@@ -61,8 +61,11 @@ li:not(.group\/menu-sub-item):not(.group\/menu-item):not(nav li) {
 }
 
 a {
-  color: hsl(var(--link));
+  @apply text-blue-600 hover:text-blue-800;
   text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
   font-weight: 500;
   transition: color 0.2s;
 }
