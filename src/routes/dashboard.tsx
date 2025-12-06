@@ -992,13 +992,15 @@ function Dashboard() {
                                       <span>Pick a date range</span>
                                     )}
                                     {dateRange?.from && (
-                                      <X
-                                        className="ml-auto h-3 w-3"
+                                      <span
+                                        className="ml-auto flex items-center cursor-pointer hover:text-destructive"
                                         onClick={(e) => {
                                           e.stopPropagation()
                                           setDateRange(undefined)
                                         }}
-                                      />
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </span>
                                     )}
                                   </Button>
                                 </PopoverTrigger>

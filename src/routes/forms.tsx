@@ -640,7 +640,7 @@ import {
 
 const [dateRange, setDateRange] = useState<DateRange | undefined>()
 
-<div className="space-y-2 max-w-sm">
+<div className="space-y-2 w-auto max-w-sm">
   <Label>Date Range</Label>
   <Popover>
     <PopoverTrigger asChild>
@@ -665,13 +665,15 @@ const [dateRange, setDateRange] = useState<DateRange | undefined>()
           <span>Pick a date range</span>
         )}
         {dateRange?.from && (
-          <X
-            className="ml-auto h-4 w-4"
+          <span
+            className="ml-auto flex items-center cursor-pointer hover:text-destructive"
             onClick={(e) => {
               e.stopPropagation()
               setDateRange(undefined)
             }}
-          />
+          >
+            <X className="h-4 w-4" />
+          </span>
         )}
       </Button>
     </PopoverTrigger>
@@ -717,14 +719,14 @@ Use Cases:
 • Report generation periods`}
                       >
                         <div className="flex flex-wrap gap-2">
-                          <div className="space-y-2 w-full max-w-sm">
+                          <div className="space-y-2 w-auto max-w-sm">
                             <Label>Date Range</Label>
                             <Popover>
                               <PopoverTrigger asChild>
                                 <Button
                                   variant="outline"
                                   className={cn(
-                                    'w-auto justify-start text-left font-normal',
+                                    'w-full justify-start text-left font-normal',
                                     !dateRange && 'text-muted-foreground',
                                   )}
                                 >
@@ -742,13 +744,15 @@ Use Cases:
                                     <span>Pick a date range</span>
                                   )}
                                   {dateRange?.from && (
-                                    <X
-                                      className="ml-auto h-4 w-4"
+                                    <span
+                                      className="ml-auto flex items-center cursor-pointer hover:text-destructive"
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         setDateRange(undefined)
                                       }}
-                                    />
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </span>
                                   )}
                                 </Button>
                               </PopoverTrigger>
@@ -761,7 +765,7 @@ Use Cases:
                                   mode="range"
                                   defaultMonth={dateRange?.from}
                                   selected={dateRange}
-                                  onSelect={(range) => setDateRange(range)}
+                                  onSelect={setDateRange}
                                   numberOfMonths={2}
                                 />
                               </PopoverContent>
