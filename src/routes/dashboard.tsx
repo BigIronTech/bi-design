@@ -7,7 +7,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   ChevronsLeft,
   ChevronsRight,
   Clock,
@@ -17,14 +16,14 @@ import {
   X,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import type { DateRange } from 'react-day-picker'
-import type { AuctionListing } from '@/data/mockAuctionData'
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from '@/components/ui/accordion'
+} from '@radix-ui/react-accordion'
+import type { DateRange } from 'react-day-picker'
+import type { AuctionListing } from '@/data/mockAuctionData'
 import { cn } from '@/lib/utils'
 import { auctionListings } from '@/data/mockAuctionData'
 import { AppSidebar } from '@/components/app-sidebar'
@@ -110,11 +109,14 @@ const getStatusBadgeVariant = (
   | 'information' => {
   switch (status) {
     case 'Needs Attention':
+    case 'Unassigned':
       return 'destructive'
     case 'Active':
-    case 'Completed':
-    case 'Published':
       return 'successful'
+    case 'Completed':
+      return 'neutral'
+    case 'Published':
+      return 'information'
     case 'Pending':
     case 'Pending Payment':
     case 'Pending Pickup':
@@ -255,23 +257,41 @@ function Dashboard() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
 
+  // View mode state
+  const [viewMode, setViewMode] = useState<'listings' | 'auctions'>('listings')
+
   // Modal state
   const [selectedListing, setSelectedListing] = useState<AuctionListing | null>(
     null,
   )
   const [isModalOpen, setIsModalOpen] = useState(false)
-
-  // Ref for scrolling to table
-  const tableCardRef = React.useRef<HTMLDivElement>(null)
+  const [assignToAuction, setAssignToAuction] = useState<string>('')
 
   const openListingModal = (listing: AuctionListing) => {
     setSelectedListing(listing)
     setIsModalOpen(true)
+    setAssignToAuction('')
   }
 
   const closeListingModal = () => {
     setIsModalOpen(false)
     setSelectedListing(null)
+    setAssignToAuction('')
+  }
+
+  const handleAssignAuction = () => {
+    if (!selectedListing || !assignToAuction) return
+
+    // In a real app, this would call an API to update the listing
+    console.log(
+      `Assigning listing ${selectedListing.id} to auction: ${assignToAuction}`,
+    )
+
+    // Close modal and show success (in real app, would update data and refetch)
+    alert(
+      `Lot "${selectedListing.title}" has been assigned to auction: ${assignToAuction}`,
+    )
+    closeListingModal()
   }
 
   const getActionSuggestion = (status: string) => {
@@ -378,9 +398,21 @@ function Dashboard() {
     ...new Set(auctionListings.map((l) => l.salesRep)),
   ].sort()
 
-  const filteredListings = auctionListings.filter(
-    (listing) => listing.status === activeTab,
-  )
+  const filteredListings = auctionListings.filter((listing) => {
+    // Filter by tab status
+    if (listing.status !== activeTab) return false
+
+    // For Pre-Auction tab, only show Published, Needs Attention, and Unassigned
+    if (activeTab === 'pre-auction') {
+      return (
+        listing.auctionStatus === 'Published' ||
+        listing.auctionStatus === 'Needs Attention' ||
+        listing.auctionStatus === 'Unassigned'
+      )
+    }
+
+    return true
+  })
 
   // Apply filters without tab filtering (for cross-tab stats)
   const allFilteredListings = auctionListings.filter((listing) => {
@@ -410,6 +442,9 @@ function Dashboard() {
 
     // Filter by Date Range
     if (dateRange?.from || dateRange?.to) {
+      // Skip date filtering for listings without endDate (like Unassigned)
+      if (!listing.endDate) return true
+
       const listingDate = new Date(listing.endDate)
 
       if (dateRange.from) {
@@ -456,6 +491,9 @@ function Dashboard() {
 
     // Filter by Date Range
     if (dateRange?.from || dateRange?.to) {
+      // Skip date filtering for listings without endDate (like Unassigned)
+      if (!listing.endDate) return true
+
       const listingDate = new Date(listing.endDate)
 
       if (dateRange.from) {
@@ -513,8 +551,9 @@ function Dashboard() {
         break
       case 'endDate':
       case 'scheduledDate':
-        aValue = new Date(a.endDate).getTime()
-        bValue = new Date(b.endDate).getTime()
+        // Handle empty endDate for unassigned listings
+        aValue = a.endDate ? new Date(a.endDate).getTime() : 0
+        bValue = b.endDate ? new Date(b.endDate).getTime() : 0
         break
       case 'location':
         aValue = a.location.toLowerCase()
@@ -550,25 +589,49 @@ function Dashboard() {
     dateRange,
     activeTab,
     itemsPerPage,
+    viewMode,
   ])
 
-  // Jake's personal stats for top cards
-  const jakeStats = {
-    'pre-auction': auctionListings.filter(
-      (l) => l.status === 'pre-auction' && l.salesRep === 'Jake Peters',
-    ).length,
-    'live-auction': auctionListings.filter(
-      (l) => l.status === 'live-auction' && l.salesRep === 'Jake Peters',
-    ).length,
-    'post-auction': auctionListings.filter(
-      (l) => l.status === 'post-auction' && l.salesRep === 'Jake Peters',
-    ).length,
-  }
+  // Group listings by auction for auctions view
+  const groupedByAuction = React.useMemo(() => {
+    const groups = new Map<string, Array<AuctionListing>>()
+
+    sortedListings.forEach((listing) => {
+      const auctionName = listing.auctionName
+      if (!groups.has(auctionName)) {
+        groups.set(auctionName, [])
+      }
+      groups.get(auctionName)!.push(listing)
+    })
+
+    // Convert to array and sort: Unassigned first, then alphabetically
+    return Array.from(groups.entries())
+      .map(([auctionName, listings]) => ({
+        auctionName,
+        listings,
+        totalListings: listings.length,
+        totalStartingBid: listings.reduce((sum, l) => sum + l.startingBid, 0),
+        totalCurrentBid: listings.reduce((sum, l) => sum + l.currentBid, 0),
+        totalBids: listings.reduce((sum, l) => sum + l.bids, 0),
+      }))
+      .sort((a, b) => {
+        // Unassigned always first
+        if (a.auctionName === 'Unassigned') return -1
+        if (b.auctionName === 'Unassigned') return 1
+        // Then alphabetically
+        return a.auctionName.localeCompare(b.auctionName)
+      })
+  }, [sortedListings])
 
   // All stats for tabs
   const stats = {
-    'pre-auction': auctionListings.filter((l) => l.status === 'pre-auction')
-      .length,
+    'pre-auction': auctionListings.filter(
+      (l) =>
+        l.status === 'pre-auction' &&
+        (l.auctionStatus === 'Published' ||
+          l.auctionStatus === 'Needs Attention' ||
+          l.auctionStatus === 'Unassigned'),
+    ).length,
     'live-auction': auctionListings.filter((l) => l.status === 'live-auction')
       .length,
     'post-auction': auctionListings.filter((l) => l.status === 'post-auction')
@@ -598,7 +661,9 @@ function Dashboard() {
         l.auctionStatus === 'Submitted',
     ).length,
     needsAttention: allFilteredListings.filter(
-      (l) => l.auctionStatus === 'Needs Attention',
+      (l) =>
+        l.auctionStatus === 'Needs Attention' ||
+        l.auctionStatus === 'Unassigned',
     ).length,
     published: allFilteredListings.filter(
       (l) => l.auctionStatus === 'Published' || l.auctionStatus === 'Active',
@@ -617,6 +682,7 @@ function Dashboard() {
   }
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return 'TBD'
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -631,175 +697,16 @@ function Dashboard() {
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-sidebar">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <h1 className="text-lg font-semibold md:text-2xl">
-              Auction Insights
+              Auction Cockpit
             </h1>
-            <div className="flex items-center gap-4 sm:justify-start justify-end">
-              <div className="text-left lg:text-right">
-                <h2 className="text-base font-semibold">
-                  Hello Jake, take action on your items
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  You have{' '}
-                  <span className="font-semibold">
-                    {
-                      auctionListings.filter(
-                        (l) =>
-                          l.salesRep === 'Jake Peters' &&
-                          l.status === 'pre-auction',
-                      ).length
-                    }{' '}
-                    items currently in Pre-Auction
-                  </span>{' '}
-                  and{' '}
-                  <span className="font-semibold">
-                    {
-                      auctionListings.filter(
-                        (l) =>
-                          l.salesRep === 'Jake Peters' &&
-                          l.auctionStatus === 'Needs Attention',
-                      ).length
-                    }{' '}
-                    items that need your immediate attention
-                  </span>
-                </p>
-              </div>
-              <Separator
-                orientation="vertical"
-                className="hidden lg:block min-h-12 w-px bg-foreground/30"
-              />
-              <div className="hidden lg:flex min-h-12 min-w-12 items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold text-lg">
-                JP
-              </div>
-            </div>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="gap-2">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  My Pre-Auction
-                </CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-row mt-auto justify-between items-end">
-                  <div>
-                    <div className="text-2xl font-bold">
-                      {jakeStats['pre-auction']}
-                    </div>
-                    <div className="flex items-end justify-between mt-1">
-                      <p className="text-xs text-muted-foreground mb-0">
-                        Upcoming auctions
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={() => {
-                      setActiveTab('pre-auction')
-                      setFilterSalesRep('Jake Peters')
-                      setTimeout(() => {
-                        tableCardRef.current?.scrollIntoView({
-                          behavior: 'smooth',
-                          block: 'start',
-                        })
-                      }, 100)
-                    }}
-                  >
-                    Show Me
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="gap-2">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  My Live Auctions
-                </CardTitle>
-                <Gavel className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-row mt-auto justify-between items-end">
-                  <div>
-                    <div className="text-2xl font-bold">
-                      {jakeStats['live-auction']}
-                    </div>
-                    <div className="flex items-end justify-between mt-1">
-                      <p className="text-xs text-muted-foreground mb-0">
-                        Currently active
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={() => {
-                      setActiveTab('live-auction')
-                      setFilterSalesRep('Jake Peters')
-                      setTimeout(() => {
-                        tableCardRef.current?.scrollIntoView({
-                          behavior: 'smooth',
-                          block: 'start',
-                        })
-                      }, 100)
-                    }}
-                  >
-                    Show Me
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="gap-2">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  My Post-Auction
-                </CardTitle>
-                <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-row mt-auto justify-between items-end">
-                  <div>
-                    <div className="text-2xl font-bold">
-                      {jakeStats['post-auction']}
-                    </div>
-                    <div className="flex items-end justify-between mt-1">
-                      <p className="text-xs text-muted-foreground mb-0">
-                        Completed auctions
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={() => {
-                      setActiveTab('post-auction')
-                      setFilterSalesRep('Jake Peters')
-                      setTimeout(() => {
-                        tableCardRef.current?.scrollIntoView({
-                          behavior: 'smooth',
-                          block: 'start',
-                        })
-                      }, 200)
-                    }}
-                  >
-                    Show Me
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Auction Listings Table */}
-          <Card ref={tableCardRef} className="scroll-mt-4 gap-2">
+          <Card className="scroll-mt-4">
             <CardHeader>
               <div className="flex items-start justify-between">
-                <div className="pr-4">
-                  <CardTitle>Browse Listings</CardTitle>
+                <div>
+                  <CardTitle>Browse Auctions and Lots</CardTitle>
                   <CardDescription>
                     View and manage auction listings across all stages
                   </CardDescription>
@@ -810,6 +717,7 @@ function Dashboard() {
             <CardContent>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsContent value={activeTab} className="mt-0">
+                  {/* Filters Section */}
                   <Accordion
                     type="single"
                     collapsible
@@ -992,15 +900,13 @@ function Dashboard() {
                                       <span>Pick a date range</span>
                                     )}
                                     {dateRange?.from && (
-                                      <span
-                                        className="ml-auto flex items-center cursor-pointer hover:text-destructive"
+                                      <X
+                                        className="ml-auto h-3 w-3"
                                         onClick={(e) => {
                                           e.stopPropagation()
                                           setDateRange(undefined)
                                         }}
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </span>
+                                      />
                                     )}
                                   </Button>
                                 </PopoverTrigger>
@@ -1025,17 +931,45 @@ function Dashboard() {
                     </AccordionItem>
                   </Accordion>
 
+                  {/* View Mode Toggle */}
+                  <div className="flex items-center justify-center mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-muted-foreground">
+                        View:
+                      </span>
+                      <Tabs
+                        value={viewMode}
+                        onValueChange={(value) =>
+                          setViewMode(value as 'listings' | 'auctions')
+                        }
+                        className="w-auto"
+                      >
+                        <TabsList className="h-9">
+                          <TabsTrigger
+                            value="listings"
+                            className="text-xs px-3 cursor-pointer"
+                          >
+                            Lots
+                          </TabsTrigger>
+                          <TabsTrigger
+                            value="auctions"
+                            className="text-xs px-3 cursor-pointer"
+                          >
+                            Auctions
+                          </TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                    </div>
+                  </div>
+
                   {/* Tabs and Status Tallies - Moved below filters */}
                   <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-                    <TabsList className="rounded-[10px] w-full lg:w-auto">
+                    <TabsList className="rounded-xl w-full lg:w-auto">
                       <TabsTrigger
                         value="pre-auction"
-                        className="gap-2 cursor-pointer rounded-lg flex-1 lg:flex-initial"
+                        className="gap-2 cursor-pointer rounded-xl flex-1 lg:flex-initial"
                       >
-                        <div className="flex">
-                          <span>Pre</span>
-                          <span className="hidden sm:flex">-Auction</span>
-                        </div>
+                        Pre-Auction
                         <Badge
                           variant="secondary"
                           style={{
@@ -1054,12 +988,9 @@ function Dashboard() {
                       </TabsTrigger>
                       <TabsTrigger
                         value="live-auction"
-                        className="gap-2 cursor-pointer rounded-lg flex-1 lg:flex-initial"
+                        className="gap-2 cursor-pointer rounded-xl flex-1 lg:flex-initial"
                       >
-                        <div className="flex">
-                          <span>Live</span>
-                          <span className="hidden sm:flex">&nbsp; Auction</span>
-                        </div>
+                        Live Auction
                         <Badge
                           variant="secondary"
                           style={{
@@ -1078,12 +1009,9 @@ function Dashboard() {
                       </TabsTrigger>
                       <TabsTrigger
                         value="post-auction"
-                        className="gap-2 cursor-pointer rounded-lg flex-1 lg:flex-initial"
+                        className="gap-2 cursor-pointer rounded-xl flex-1 lg:flex-initial"
                       >
-                        <div className="flex">
-                          <span>Post</span>
-                          <span className="hidden sm:flex">-Auction</span>
-                        </div>
+                        Post-Auction
                         <Badge
                           variant="secondary"
                           style={{
@@ -1160,7 +1088,7 @@ function Dashboard() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Badge
-                              variant="successful"
+                              variant="neutral"
                               className="gap-1 cursor-help"
                             >
                               Completed
@@ -1177,226 +1105,511 @@ function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader className="bg-muted">
-                        <TableRow>
-                          <SortableTableHead
-                            column="id"
-                            label="Auction"
-                            sortColumn={sortColumn}
-                            sortDirection={sortDirection}
-                            onSort={handleSort}
-                          />
-                          <SortableTableHead
-                            column="title"
-                            label="Item Name"
-                            sortColumn={sortColumn}
-                            sortDirection={sortDirection}
-                            onSort={handleSort}
-                          />
-                          <SortableTableHead
-                            column="category"
-                            label="Category"
-                            sortColumn={sortColumn}
-                            sortDirection={sortDirection}
-                            onSort={handleSort}
-                          />
-                          <SortableTableHead
-                            column="status"
-                            label="Status"
-                            sortColumn={sortColumn}
-                            sortDirection={sortDirection}
-                            onSort={handleSort}
-                          />
-                          {activeTab !== 'post-auction' && (
+                  {/* Listings View */}
+                  {viewMode === 'listings' && (
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader className="bg-muted">
+                          <TableRow>
                             <SortableTableHead
-                              column="openingBid"
-                              label="Opening Bid"
+                              column="id"
+                              label="Auction"
                               sortColumn={sortColumn}
                               sortDirection={sortDirection}
                               onSort={handleSort}
                             />
-                          )}
-                          {activeTab !== 'pre-auction' && (
+                            <SortableTableHead
+                              column="title"
+                              label="Lot Title"
+                              sortColumn={sortColumn}
+                              sortDirection={sortDirection}
+                              onSort={handleSort}
+                            />
+                            <SortableTableHead
+                              column="category"
+                              label="Category"
+                              sortColumn={sortColumn}
+                              sortDirection={sortDirection}
+                              onSort={handleSort}
+                            />
+                            <SortableTableHead
+                              column="status"
+                              label="Status"
+                              sortColumn={sortColumn}
+                              sortDirection={sortDirection}
+                              onSort={handleSort}
+                            />
+                            {activeTab !== 'post-auction' && (
+                              <SortableTableHead
+                                column="openingBid"
+                                label="Opening Bid"
+                                sortColumn={sortColumn}
+                                sortDirection={sortDirection}
+                                onSort={handleSort}
+                              />
+                            )}
+                            {activeTab !== 'pre-auction' && (
+                              <SortableTableHead
+                                column={
+                                  activeTab === 'post-auction'
+                                    ? 'winningBid'
+                                    : 'currentBid'
+                                }
+                                label={
+                                  activeTab === 'post-auction'
+                                    ? 'Winning Bid'
+                                    : 'Current Bid'
+                                }
+                                sortColumn={sortColumn}
+                                sortDirection={sortDirection}
+                                onSort={handleSort}
+                              />
+                            )}
+                            {activeTab !== 'pre-auction' && (
+                              <SortableTableHead
+                                column="bids"
+                                label="Bids"
+                                sortColumn={sortColumn}
+                                sortDirection={sortDirection}
+                                onSort={handleSort}
+                                className="text-center"
+                              />
+                            )}
                             <SortableTableHead
                               column={
-                                activeTab === 'post-auction'
-                                  ? 'winningBid'
-                                  : 'currentBid'
+                                activeTab === 'pre-auction'
+                                  ? 'scheduledDate'
+                                  : 'endDate'
                               }
                               label={
-                                activeTab === 'post-auction'
-                                  ? 'Winning Bid'
-                                  : 'Current Bid'
+                                activeTab === 'pre-auction'
+                                  ? 'Scheduled Date'
+                                  : 'End Date'
                               }
                               sortColumn={sortColumn}
                               sortDirection={sortDirection}
                               onSort={handleSort}
                             />
-                          )}
-                          {activeTab !== 'pre-auction' && (
                             <SortableTableHead
-                              column="bids"
-                              label="Bids"
+                              column="location"
+                              label="Location"
                               sortColumn={sortColumn}
                               sortDirection={sortDirection}
                               onSort={handleSort}
-                              className="text-center"
                             />
-                          )}
-                          <SortableTableHead
-                            column={
-                              activeTab === 'pre-auction'
-                                ? 'scheduledDate'
-                                : 'endDate'
-                            }
-                            label={
-                              activeTab === 'pre-auction'
-                                ? 'Scheduled Date'
-                                : 'End Date'
-                            }
-                            sortColumn={sortColumn}
-                            sortDirection={sortDirection}
-                            onSort={handleSort}
-                          />
-                          <SortableTableHead
-                            column="location"
-                            label="Location"
-                            sortColumn={sortColumn}
-                            sortDirection={sortDirection}
-                            onSort={handleSort}
-                          />
-                          <SortableTableHead
-                            column="salesRep"
-                            label="Sales Rep"
-                            sortColumn={sortColumn}
-                            sortDirection={sortDirection}
-                            onSort={handleSort}
-                          />
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedListings.length === 0 ? (
-                          <TableRow>
-                            <TableCell
-                              colSpan={11}
-                              className="text-center h-24 text-muted-foreground"
-                            >
-                              {hasActiveFilters
-                                ? 'No listings match your filter criteria'
-                                : 'No listings found in this category'}
-                            </TableCell>
+                            <SortableTableHead
+                              column="salesRep"
+                              label="Sales Rep"
+                              sortColumn={sortColumn}
+                              sortDirection={sortDirection}
+                              onSort={handleSort}
+                            />
+                            <TableHead className="text-right">
+                              Actions
+                            </TableHead>
                           </TableRow>
-                        ) : (
-                          paginatedListings.map((listing) => (
-                            <TableRow key={listing.id}>
-                              <TableCell className="font-medium">
-                                <TooltipProvider>
-                                  <TruncatedCell text={listing.auctionName} />
-                                </TooltipProvider>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-col">
-                                  <span className="font-medium">
-                                    <TooltipProvider>
-                                      <TruncatedCell text={listing.title} />
-                                    </TooltipProvider>
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    <TooltipProvider>
-                                      <TruncatedCell text={listing.seller} />
-                                    </TooltipProvider>
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline">
-                                  <TooltipProvider>
-                                    <TruncatedCell text={listing.category} />
-                                  </TooltipProvider>
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant={getStatusBadgeVariant(
-                                    listing.auctionStatus,
-                                  )}
-                                >
-                                  <TooltipProvider>
-                                    <TruncatedCell
-                                      text={listing.auctionStatus}
-                                    />
-                                  </TooltipProvider>
-                                </Badge>
-                              </TableCell>
-                              {activeTab !== 'post-auction' && (
-                                <TableCell>
-                                  {formatCurrency(listing.startingBid)}
-                                </TableCell>
-                              )}
-                              {activeTab !== 'pre-auction' && (
-                                <TableCell className="font-semibold">
-                                  {formatCurrency(listing.currentBid)}
-                                </TableCell>
-                              )}
-                              {activeTab !== 'pre-auction' && (
-                                <TableCell className="text-center">
-                                  {listing.bids}
-                                </TableCell>
-                              )}
-                              <TableCell>
-                                {formatDate(listing.endDate)}
-                              </TableCell>
-                              <TableCell>
-                                <TooltipProvider>
-                                  <TruncatedCell text={listing.location} />
-                                </TooltipProvider>
-                              </TableCell>
-                              <TableCell>
-                                <TooltipProvider>
-                                  <TruncatedCell text={listing.salesRep} />
-                                </TooltipProvider>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => openListingModal(listing)}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                  <span className="sr-only">View details</span>
-                                </Button>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedListings.length === 0 ? (
+                            <TableRow>
+                              <TableCell
+                                colSpan={11}
+                                className="text-center h-24 text-muted-foreground"
+                              >
+                                {hasActiveFilters
+                                  ? 'No listings match your filter criteria'
+                                  : 'No listings found in this category'}
                               </TableCell>
                             </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                          ) : (
+                            paginatedListings.map((listing) => (
+                              <TableRow
+                                key={listing.id}
+                                className="cursor-pointer"
+                                onClick={() => openListingModal(listing)}
+                              >
+                                <TableCell className="font-medium">
+                                  <TooltipProvider>
+                                    <TruncatedCell
+                                      text={
+                                        listing.auctionName === 'Unassigned'
+                                          ? 'No Auction Assigned'
+                                          : listing.auctionName
+                                      }
+                                    />
+                                  </TooltipProvider>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">
+                                      <TooltipProvider>
+                                        <TruncatedCell text={listing.title} />
+                                      </TooltipProvider>
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      <TooltipProvider>
+                                        <TruncatedCell text={listing.seller} />
+                                      </TooltipProvider>
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline">
+                                    <TooltipProvider>
+                                      <TruncatedCell text={listing.category} />
+                                    </TooltipProvider>
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant={getStatusBadgeVariant(
+                                      listing.auctionStatus,
+                                    )}
+                                  >
+                                    <TooltipProvider>
+                                      <TruncatedCell
+                                        text={
+                                          listing.auctionStatus === 'Unassigned'
+                                            ? 'Unassigned Auction'
+                                            : listing.auctionStatus
+                                        }
+                                      />
+                                    </TooltipProvider>
+                                  </Badge>
+                                </TableCell>
+                                {activeTab !== 'post-auction' && (
+                                  <TableCell>
+                                    {formatCurrency(listing.startingBid)}
+                                  </TableCell>
+                                )}
+                                {activeTab !== 'pre-auction' && (
+                                  <TableCell className="font-semibold">
+                                    {formatCurrency(listing.currentBid)}
+                                  </TableCell>
+                                )}
+                                {activeTab !== 'pre-auction' && (
+                                  <TableCell className="text-center">
+                                    {listing.bids}
+                                  </TableCell>
+                                )}
+                                <TableCell>
+                                  {formatDate(listing.endDate)}
+                                </TableCell>
+                                <TableCell>
+                                  <TooltipProvider>
+                                    <TruncatedCell text={listing.location} />
+                                  </TooltipProvider>
+                                </TableCell>
+                                <TableCell>
+                                  <TooltipProvider>
+                                    <TruncatedCell text={listing.salesRep} />
+                                  </TooltipProvider>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      openListingModal(listing)
+                                    }}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    <span className="sr-only">
+                                      View details
+                                    </span>
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+
+                  {/* Auctions View */}
+                  {viewMode === 'auctions' && (
+                    <div className="space-y-4">
+                      {groupedByAuction.length === 0 ? (
+                        <div className="text-center py-12 text-muted-foreground border rounded-md">
+                          {hasActiveFilters
+                            ? 'No auctions match your filter criteria'
+                            : 'No auctions found in this category'}
+                        </div>
+                      ) : (
+                        <Accordion type="multiple" className="w-full space-y-3">
+                          {groupedByAuction.map((auction) => (
+                            <AccordionItem
+                              key={auction.auctionName}
+                              value={auction.auctionName}
+                              className="border rounded-lg bg-background hover:bg-muted/50 transition-colors cursor-pointer group"
+                            >
+                              <AccordionTrigger className="px-6 py-4 hover:no-underline cursor-pointer w-full">
+                                <div className="flex items-center justify-between w-full gap-4">
+                                  {/* Left: Auction Name & Count */}
+                                  <div className="flex flex-col items-start gap-1 flex-1">
+                                    <span className="font-semibold text-base">
+                                      {auction.auctionName === 'Unassigned'
+                                        ? 'Unassigned Lots'
+                                        : auction.auctionName}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground font-normal">
+                                      {auction.totalListings}{' '}
+                                      {auction.totalListings === 1
+                                        ? 'listing'
+                                        : 'listings'}
+                                      {activeTab !== 'pre-auction' &&
+                                        ` • ${auction.totalBids} ${auction.totalBids === 1 ? 'bid' : 'bids'}`}
+                                    </span>
+                                  </div>
+
+                                  {/* Center: Dates */}
+                                  <div className="flex items-center gap-4 flex-1 justify-center">
+                                    {auction.auctionName !== 'Unassigned' &&
+                                    auction.listings[0]?.endDate ? (
+                                      <>
+                                        <div className="text-center">
+                                          <div className="text-xs text-muted-foreground">
+                                            {activeTab === 'pre-auction'
+                                              ? 'Opens'
+                                              : 'Opened'}
+                                          </div>
+                                          <div className="text-sm font-medium">
+                                            {format(
+                                              new Date(
+                                                auction.listings[0].endDate,
+                                              ).setDate(
+                                                new Date(
+                                                  auction.listings[0].endDate,
+                                                ).getDate() - 14,
+                                              ),
+                                              'MMM dd, yyyy',
+                                            )}
+                                          </div>
+                                        </div>
+                                        <span className="text-muted-foreground">
+                                          →
+                                        </span>
+                                        <div className="text-center">
+                                          <div className="text-xs text-muted-foreground">
+                                            {activeTab === 'pre-auction'
+                                              ? 'Closes'
+                                              : activeTab === 'post-auction'
+                                                ? 'Closed'
+                                                : 'Closes'}
+                                          </div>
+                                          <div className="text-sm font-medium">
+                                            {format(
+                                              new Date(
+                                                auction.listings[0].endDate,
+                                              ),
+                                              'MMM dd, yyyy',
+                                            )}
+                                          </div>
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <span className="text-sm text-muted-foreground">
+                                        No dates assigned
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Right: Bid Totals & Expand Icon */}
+                                  <div className="flex items-center gap-6 flex-1 justify-end">
+                                    {/* Total Target (always shown) */}
+                                    <div className="text-right">
+                                      <div className="text-xs text-muted-foreground">
+                                        Total Target
+                                      </div>
+                                      <div className="text-sm font-semibold">
+                                        {formatCurrency(
+                                          auction.totalStartingBid,
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Actual Total (live and post-auction only) */}
+                                    {activeTab !== 'pre-auction' && (
+                                      <div className="text-right">
+                                        <div className="text-xs text-muted-foreground">
+                                          Actual Total
+                                        </div>
+                                        <div className="text-sm font-semibold">
+                                          {formatCurrency(
+                                            auction.totalCurrentBid,
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Chevron with rotation */}
+                                    <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 flex-shrink-0 cursor-pointer group-data-[state=open]:rotate-180" />
+                                  </div>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent className="px-4 pb-4">
+                                <div className="rounded-md border mt-2">
+                                  <Table>
+                                    <TableHeader className="bg-muted">
+                                      <TableRow>
+                                        <TableHead>Lot Title</TableHead>
+                                        <TableHead>Category</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        {activeTab !== 'post-auction' && (
+                                          <TableHead>Opening Bid</TableHead>
+                                        )}
+                                        {activeTab !== 'pre-auction' && (
+                                          <TableHead>
+                                            {activeTab === 'post-auction'
+                                              ? 'Winning Bid'
+                                              : 'Current Bid'}
+                                          </TableHead>
+                                        )}
+                                        {activeTab !== 'pre-auction' && (
+                                          <TableHead className="text-center">
+                                            Bids
+                                          </TableHead>
+                                        )}
+                                        <TableHead>
+                                          {activeTab === 'pre-auction'
+                                            ? 'Scheduled Date'
+                                            : 'End Date'}
+                                        </TableHead>
+                                        <TableHead>Location</TableHead>
+                                        <TableHead>Sales Rep</TableHead>
+                                        <TableHead className="text-right">
+                                          Actions
+                                        </TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {auction.listings.map((listing) => (
+                                        <TableRow
+                                          key={listing.id}
+                                          className="cursor-pointer"
+                                          onClick={() =>
+                                            openListingModal(listing)
+                                          }
+                                        >
+                                          <TableCell>
+                                            <div className="flex flex-col">
+                                              <span className="font-medium">
+                                                <TooltipProvider>
+                                                  <TruncatedCell
+                                                    text={listing.title}
+                                                  />
+                                                </TooltipProvider>
+                                              </span>
+                                              <span className="text-xs text-muted-foreground">
+                                                <TooltipProvider>
+                                                  <TruncatedCell
+                                                    text={listing.seller}
+                                                  />
+                                                </TooltipProvider>
+                                              </span>
+                                            </div>
+                                          </TableCell>
+                                          <TableCell>
+                                            <Badge variant="outline">
+                                              <TooltipProvider>
+                                                <TruncatedCell
+                                                  text={listing.category}
+                                                />
+                                              </TooltipProvider>
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell>
+                                            <Badge
+                                              variant={getStatusBadgeVariant(
+                                                listing.auctionStatus,
+                                              )}
+                                            >
+                                              <TooltipProvider>
+                                                <TruncatedCell
+                                                  text={
+                                                    listing.auctionStatus ===
+                                                    'Unassigned'
+                                                      ? 'Unassigned Auction'
+                                                      : listing.auctionStatus
+                                                  }
+                                                />
+                                              </TooltipProvider>
+                                            </Badge>
+                                          </TableCell>
+                                          {activeTab !== 'post-auction' && (
+                                            <TableCell>
+                                              {formatCurrency(
+                                                listing.startingBid,
+                                              )}
+                                            </TableCell>
+                                          )}
+                                          {activeTab !== 'pre-auction' && (
+                                            <TableCell className="font-semibold">
+                                              {formatCurrency(
+                                                listing.currentBid,
+                                              )}
+                                            </TableCell>
+                                          )}
+                                          {activeTab !== 'pre-auction' && (
+                                            <TableCell className="text-center">
+                                              {listing.bids}
+                                            </TableCell>
+                                          )}
+                                          <TableCell>
+                                            {formatDate(listing.endDate)}
+                                          </TableCell>
+                                          <TableCell>
+                                            <TooltipProvider>
+                                              <TruncatedCell
+                                                text={listing.location}
+                                              />
+                                            </TooltipProvider>
+                                          </TableCell>
+                                          <TableCell>
+                                            <TooltipProvider>
+                                              <TruncatedCell
+                                                text={listing.salesRep}
+                                              />
+                                            </TooltipProvider>
+                                          </TableCell>
+                                          <TableCell className="text-right">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                openListingModal(listing)
+                                              }}
+                                            >
+                                              <Eye className="h-4 w-4" />
+                                              <span className="sr-only">
+                                                View details
+                                              </span>
+                                            </Button>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          ))}
+                        </Accordion>
+                      )}
+                    </div>
+                  )}
 
                   {/* Pagination Controls */}
-                  {totalItems > 0 && (
+                  {viewMode === 'listings' && totalItems > 0 && (
                     <div className="flex items-center justify-between px-2 py-4">
-                      <div className="sm:flex hidden items-center gap-4">
-                        <div className="text-sm text-muted-foreground">
-                          {' '}
-                          <span className="font-medium">
-                            {startIndex + 1}
-                          </span>{' '}
-                          to{' '}
-                          <span className="font-medium">
-                            {Math.min(endIndex, totalItems)}
-                          </span>{' '}
-                          of <span className="font-medium">{totalItems}</span>
-                        </div>
-                      </div>
-                      <div className="flex ml-auto items-center gap-6 w-fit">
-                        <div className="sm:flex hidden items-center gap-2">
-                          <p className="text-sm text-muted-foreground !mb-0">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm text-muted-foreground m-0">
                             Rows per page
-                          </p>
+                          </div>
                           <Select
                             value={itemsPerPage.toString()}
                             onValueChange={(value) =>
@@ -1414,51 +1627,60 @@ function Dashboard() {
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="text-sm font-medium mr-1">
+                        <div className="text-sm text-muted-foreground">
+                          Showing{' '}
+                          <span className="font-medium">{startIndex + 1}</span>{' '}
+                          to{' '}
+                          <span className="font-medium">
+                            {Math.min(endIndex, totalItems)}
+                          </span>{' '}
+                          of <span className="font-medium">{totalItems}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-sm text-muted-foreground mr-2">
                           Page {currentPage} of {totalPages}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8 sm:flex hidden"
-                            onClick={() => setCurrentPage(1)}
-                            disabled={currentPage === 1}
-                          >
-                            <ChevronsLeft className="h-4 w-4" />
-                            <span className="sr-only">First page</span>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => setCurrentPage(currentPage - 1)}
-                            disabled={currentPage === 1}
-                          >
-                            <ChevronLeft className="h-4 w-4" />
-                            <span className="sr-only">Previous page</span>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => setCurrentPage(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                            <span className="sr-only">Next page</span>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8 sm:flex hidden"
-                            onClick={() => setCurrentPage(totalPages)}
-                            disabled={currentPage === totalPages}
-                          >
-                            <ChevronsRight className="h-4 w-4" />
-                            <span className="sr-only">Last page</span>
-                          </Button>
-                        </div>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setCurrentPage(1)}
+                          disabled={currentPage === 1}
+                        >
+                          <ChevronsLeft className="h-4 w-4" />
+                          <span className="sr-only">First page</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setCurrentPage(currentPage - 1)}
+                          disabled={currentPage === 1}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                          <span className="sr-only">Previous page</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setCurrentPage(currentPage + 1)}
+                          disabled={currentPage === totalPages}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                          <span className="sr-only">Next page</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setCurrentPage(totalPages)}
+                          disabled={currentPage === totalPages}
+                        >
+                          <ChevronsRight className="h-4 w-4" />
+                          <span className="sr-only">Last page</span>
+                        </Button>
                       </div>
                     </div>
                   )}
@@ -1651,6 +1873,38 @@ function Dashboard() {
 
                 <Separator />
 
+                {/* Auction Assignment - only for Unassigned listings */}
+                {selectedListing.auctionStatus === 'Unassigned' && (
+                  <div className="space-y-3 bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <div>
+                      <Label className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                        Assign to Auction
+                      </Label>
+                      <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                        This lot needs to be assigned to an auction before it
+                        can be published.
+                      </p>
+                    </div>
+                    <Select
+                      value={assignToAuction}
+                      onValueChange={setAssignToAuction}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select an auction..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {uniqueAuctionNames
+                          .filter((name) => name !== 'Unassigned')
+                          .map((name) => (
+                            <SelectItem key={name} value={name}>
+                              {name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 {/* Action Suggestion */}
                 <div className="space-y-3 bg-muted/50 p-4 rounded-lg">
                   <div className="flex items-start gap-2">
@@ -1688,9 +1942,18 @@ function Dashboard() {
                 <Button variant="outline" onClick={closeListingModal}>
                   Close
                 </Button>
-                <Button onClick={closeListingModal}>
-                  {getActionSuggestion(selectedListing.auctionStatus).action}
-                </Button>
+                {selectedListing.auctionStatus === 'Unassigned' ? (
+                  <Button
+                    onClick={handleAssignAuction}
+                    disabled={!assignToAuction}
+                  >
+                    Save Assignment
+                  </Button>
+                ) : (
+                  <Button onClick={closeListingModal}>
+                    {getActionSuggestion(selectedListing.auctionStatus).action}
+                  </Button>
+                )}
               </DialogFooter>
             </>
           )}

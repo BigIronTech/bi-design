@@ -315,7 +315,158 @@ Key Features:
                           />
                         </div>
                       </ComponentDemo>
+                      <ComponentDemo
+                        title="Date Range Picker"
+                        description="Select a date range with an intuitive calendar interface"
+                        code={`import { useState } from 'react'
+import { CalendarIcon, X } from 'lucide-react'
+import { format } from 'date-fns'
+import { DateRange } from 'react-day-picker'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Calendar } from '@/components/ui/calendar'
+import { Label } from '@/components/ui/label'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 
+const [dateRange, setDateRange] = useState<DateRange | undefined>()
+
+<div className="space-y-2 w-auto max-w-sm">
+  <Label>Date Range</Label>
+  <Popover>
+    <PopoverTrigger asChild>
+      <Button
+        variant="outline"
+        className={cn(
+          "w-full justify-start text-left font-normal",
+          !dateRange && "text-muted-foreground"
+        )}
+      >
+        <CalendarIcon className="mr-2 h-4 w-4" />
+        {dateRange?.from ? (
+          dateRange.to ? (
+            <>
+              {format(dateRange.from, "LLL dd, y")} -{" "}
+              {format(dateRange.to, "LLL dd, y")}
+            </>
+          ) : (
+            format(dateRange.from, "LLL dd, y")
+          )
+        ) : (
+          <span>Pick a date range</span>
+        )}
+        {dateRange?.from && (
+          <span
+            className="ml-auto flex items-center cursor-pointer hover:text-destructive"
+            onClick={(e) => {
+              e.stopPropagation()
+              setDateRange(undefined)
+            }}
+          >
+            <X className="h-4 w-4" />
+          </span>
+        )}
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent className="w-auto p-0 border rounded-md shadow-md" align="start">
+      <Calendar
+        initialFocus
+        mode="range"
+        defaultMonth={dateRange?.from}
+        selected={dateRange}
+        onSelect={setDateRange}
+        numberOfMonths={2}
+      />
+    </PopoverContent>
+  </Popover>
+</div>`}
+                        docs={`Date range picker component using react-day-picker with a popover interface. Perfect for filtering data, booking systems, and date selection.
+
+Features:
+• Visual calendar interface with 2-month view
+• Select start and end dates by clicking
+• Clear selection with X button
+• Formatted date display (e.g., "Dec 01, 2025 - Dec 15, 2025")
+• Keyboard accessible
+• Mobile-friendly touch interface
+• Proper ARIA labels for accessibility
+
+Components Used:
+• Popover - Overlay container
+• Button - Trigger with date display
+• Calendar - Date selection interface (react-day-picker)
+• Icons - CalendarIcon, X for clear
+
+State Management:
+• Uses DateRange type from react-day-picker
+• Stores { from: Date, to: Date } or undefined
+• Updates on selection via onSelect callback
+
+Use Cases:
+• Date filtering in dashboards
+• Booking/reservation systems
+• Event date selection
+• Analytics date ranges
+• Report generation periods`}
+                      >
+                        <div className="flex flex-wrap gap-2">
+                          <div className="space-y-2 w-auto max-w-sm">
+                            <Label>Date Range</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    'w-full justify-start text-left font-normal',
+                                    !dateRange && 'text-muted-foreground',
+                                  )}
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {dateRange?.from ? (
+                                    dateRange.to ? (
+                                      <>
+                                        {format(dateRange.from, 'LLL dd, y')} -{' '}
+                                        {format(dateRange.to, 'LLL dd, y')}
+                                      </>
+                                    ) : (
+                                      format(dateRange.from, 'LLL dd, y')
+                                    )
+                                  ) : (
+                                    <span>Pick a date range</span>
+                                  )}
+                                  {dateRange?.from && (
+                                    <span
+                                      className="ml-auto flex items-center cursor-pointer hover:text-destructive"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setDateRange(undefined)
+                                      }}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </span>
+                                  )}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                className="w-auto p-0 border rounded-md shadow-md"
+                                align="start"
+                              >
+                                <Calendar
+                                  initialFocus
+                                  mode="range"
+                                  defaultMonth={dateRange?.from}
+                                  selected={dateRange}
+                                  onSelect={setDateRange}
+                                  numberOfMonths={2}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </div>
+                      </ComponentDemo>
                       <ComponentDemo
                         title="Form Controls"
                         code={`import { Checkbox } from '@/components/ui/checkbox'
@@ -619,158 +770,6 @@ Validation:
                             onOpenChange={setShowRegistration}
                             onRegister={handleRegistration}
                           />
-                        </div>
-                      </ComponentDemo>
-                      <ComponentDemo
-                        title="Date Range Picker"
-                        description="Select a date range with an intuitive calendar interface"
-                        code={`import { useState } from 'react'
-import { CalendarIcon, X } from 'lucide-react'
-import { format } from 'date-fns'
-import { DateRange } from 'react-day-picker'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { Calendar } from '@/components/ui/calendar'
-import { Label } from '@/components/ui/label'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-
-const [dateRange, setDateRange] = useState<DateRange | undefined>()
-
-<div className="space-y-2 w-auto max-w-sm">
-  <Label>Date Range</Label>
-  <Popover>
-    <PopoverTrigger asChild>
-      <Button
-        variant="outline"
-        className={cn(
-          "w-full justify-start text-left font-normal",
-          !dateRange && "text-muted-foreground"
-        )}
-      >
-        <CalendarIcon className="mr-2 h-4 w-4" />
-        {dateRange?.from ? (
-          dateRange.to ? (
-            <>
-              {format(dateRange.from, "LLL dd, y")} -{" "}
-              {format(dateRange.to, "LLL dd, y")}
-            </>
-          ) : (
-            format(dateRange.from, "LLL dd, y")
-          )
-        ) : (
-          <span>Pick a date range</span>
-        )}
-        {dateRange?.from && (
-          <span
-            className="ml-auto flex items-center cursor-pointer hover:text-destructive"
-            onClick={(e) => {
-              e.stopPropagation()
-              setDateRange(undefined)
-            }}
-          >
-            <X className="h-4 w-4" />
-          </span>
-        )}
-      </Button>
-    </PopoverTrigger>
-    <PopoverContent className="w-auto p-0 border rounded-md shadow-md" align="start">
-      <Calendar
-        initialFocus
-        mode="range"
-        defaultMonth={dateRange?.from}
-        selected={dateRange}
-        onSelect={setDateRange}
-        numberOfMonths={2}
-      />
-    </PopoverContent>
-  </Popover>
-</div>`}
-                        docs={`Date range picker component using react-day-picker with a popover interface. Perfect for filtering data, booking systems, and date selection.
-
-Features:
-• Visual calendar interface with 2-month view
-• Select start and end dates by clicking
-• Clear selection with X button
-• Formatted date display (e.g., "Dec 01, 2025 - Dec 15, 2025")
-• Keyboard accessible
-• Mobile-friendly touch interface
-• Proper ARIA labels for accessibility
-
-Components Used:
-• Popover - Overlay container
-• Button - Trigger with date display
-• Calendar - Date selection interface (react-day-picker)
-• Icons - CalendarIcon, X for clear
-
-State Management:
-• Uses DateRange type from react-day-picker
-• Stores { from: Date, to: Date } or undefined
-• Updates on selection via onSelect callback
-
-Use Cases:
-• Date filtering in dashboards
-• Booking/reservation systems
-• Event date selection
-• Analytics date ranges
-• Report generation periods`}
-                      >
-                        <div className="flex flex-wrap gap-2">
-                          <div className="space-y-2 w-auto max-w-sm">
-                            <Label>Date Range</Label>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  className={cn(
-                                    'w-full justify-start text-left font-normal',
-                                    !dateRange && 'text-muted-foreground',
-                                  )}
-                                >
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {dateRange?.from ? (
-                                    dateRange.to ? (
-                                      <>
-                                        {format(dateRange.from, 'LLL dd, y')} -{' '}
-                                        {format(dateRange.to, 'LLL dd, y')}
-                                      </>
-                                    ) : (
-                                      format(dateRange.from, 'LLL dd, y')
-                                    )
-                                  ) : (
-                                    <span>Pick a date range</span>
-                                  )}
-                                  {dateRange?.from && (
-                                    <span
-                                      className="ml-auto flex items-center cursor-pointer hover:text-destructive"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setDateRange(undefined)
-                                      }}
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </span>
-                                  )}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent
-                                className="w-auto p-0 border rounded-md shadow-md"
-                                align="start"
-                              >
-                                <Calendar
-                                  initialFocus
-                                  mode="range"
-                                  defaultMonth={dateRange?.from}
-                                  selected={dateRange}
-                                  onSelect={setDateRange}
-                                  numberOfMonths={2}
-                                />
-                              </PopoverContent>
-                            </Popover>
-                          </div>
                         </div>
                       </ComponentDemo>
                       <ComponentDemo
