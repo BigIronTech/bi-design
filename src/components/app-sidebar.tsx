@@ -76,7 +76,7 @@ const navItems = [
     to: '/dashboard',
     icon: CirclePlay,
     subItems: [
-      { id: 'auction-insights', label: 'Auction Insights', to: '/dashboard' },
+      { id: 'auction-insights', label: 'Auction Cockpit', to: '/dashboard' },
     ],
   },
 ]

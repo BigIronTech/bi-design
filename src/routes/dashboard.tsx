@@ -16,12 +16,6 @@ import {
   X,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@radix-ui/react-accordion'
 import type { DateRange } from 'react-day-picker'
 import type { AuctionListing } from '@/data/mockAuctionData'
 import { cn } from '@/lib/utils'
@@ -84,6 +78,12 @@ import {
 } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -103,7 +103,7 @@ const getStatusBadgeVariant = (
   | 'secondary'
   | 'destructive'
   | 'outline'
-  | 'successful'
+  | 'brand'
   | 'warning'
   | 'neutral'
   | 'information' => {
@@ -112,7 +112,7 @@ const getStatusBadgeVariant = (
     case 'Unassigned':
       return 'destructive'
     case 'Active':
-      return 'successful'
+      return 'brand'
     case 'Completed':
       return 'neutral'
     case 'Published':
@@ -251,6 +251,7 @@ function Dashboard() {
   const [filterAuctionId, setFilterAuctionId] = useState('')
   const [filterTitle, setFilterTitle] = useState('')
   const [filterSalesRep, setFilterSalesRep] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
 
   // Pagination state
@@ -259,6 +260,16 @@ function Dashboard() {
 
   // View mode state
   const [viewMode, setViewMode] = useState<'listings' | 'auctions'>('listings')
+
+  // Filter accordion state
+  const [filterAccordionValue, setFilterAccordionValue] = useState<
+    string | undefined
+  >('item-1')
+
+  // Accordion state for auto-expansion
+  const [expandedAccordions, setExpandedAccordions] = useState<Array<string>>(
+    [],
+  )
 
   // Modal state
   const [selectedListing, setSelectedListing] = useState<AuctionListing | null>(
@@ -379,6 +390,7 @@ function Dashboard() {
     setFilterAuctionId('')
     setFilterTitle('')
     setFilterSalesRep('')
+    setFilterStatus('')
     setDateRange(undefined)
   }
 
@@ -386,6 +398,7 @@ function Dashboard() {
     filterAuctionId ||
     filterTitle ||
     filterSalesRep ||
+    (filterStatus && filterStatus !== 'all') ||
     dateRange?.from ||
     dateRange?.to
 
@@ -402,13 +415,55 @@ function Dashboard() {
     // Filter by tab status
     if (listing.status !== activeTab) return false
 
-    // For Pre-Auction tab, only show Published, Needs Attention, and Unassigned
-    if (activeTab === 'pre-auction') {
-      return (
-        listing.auctionStatus === 'Published' ||
-        listing.auctionStatus === 'Needs Attention' ||
-        listing.auctionStatus === 'Unassigned'
-      )
+    return true
+  })
+
+  // Apply filters without tab filtering AND without status filtering (for badge counts)
+  const allFilteredListingsNoStatus = auctionListings.filter((listing) => {
+    // Filter by Auction Name
+    if (
+      filterAuctionId &&
+      !listing.auctionName.toLowerCase().includes(filterAuctionId.toLowerCase())
+    ) {
+      return false
+    }
+
+    // Filter by Title
+    if (
+      filterTitle &&
+      !listing.title.toLowerCase().includes(filterTitle.toLowerCase())
+    ) {
+      return false
+    }
+
+    // Filter by Sales Rep
+    if (
+      filterSalesRep &&
+      !listing.salesRep.toLowerCase().includes(filterSalesRep.toLowerCase())
+    ) {
+      return false
+    }
+
+    // NO Status filtering - we want badge counts to stay constant
+
+    // Filter by Date Range
+    if (dateRange?.from || dateRange?.to) {
+      // Skip date filtering for listings without endDate (like Unassigned)
+      if (!listing.endDate) return true
+
+      const listingDate = new Date(listing.endDate)
+
+      if (dateRange.from) {
+        const startDate = new Date(dateRange.from)
+        startDate.setHours(0, 0, 0, 0)
+        if (listingDate < startDate) return false
+      }
+
+      if (dateRange.to) {
+        const endDate = new Date(dateRange.to)
+        endDate.setHours(23, 59, 59, 999)
+        if (listingDate > endDate) return false
+      }
     }
 
     return true
@@ -438,6 +493,33 @@ function Dashboard() {
       !listing.salesRep.toLowerCase().includes(filterSalesRep.toLowerCase())
     ) {
       return false
+    }
+
+    // Filter by Status
+    if (filterStatus && filterStatus !== 'all') {
+      // Special case: "Needs Attention" also includes "Unassigned" items
+      if (filterStatus === 'Needs Attention') {
+        if (
+          listing.auctionStatus !== 'Needs Attention' &&
+          listing.auctionStatus !== 'Unassigned'
+        ) {
+          return false
+        }
+      }
+      // Special case: "Pending" includes multiple pending-related statuses
+      else if (filterStatus === 'Pending') {
+        if (
+          listing.auctionStatus !== 'Pending' &&
+          listing.auctionStatus !== 'Queued' &&
+          listing.auctionStatus !== 'Pending Payment' &&
+          listing.auctionStatus !== 'Pending Pickup' &&
+          listing.auctionStatus !== 'Submitted'
+        ) {
+          return false
+        }
+      } else if (listing.auctionStatus !== filterStatus) {
+        return false
+      }
     }
 
     // Filter by Date Range
@@ -487,6 +569,33 @@ function Dashboard() {
       !listing.salesRep.toLowerCase().includes(filterSalesRep.toLowerCase())
     ) {
       return false
+    }
+
+    // Filter by Status
+    if (filterStatus && filterStatus !== 'all') {
+      // Special case: "Needs Attention" also includes "Unassigned" items
+      if (filterStatus === 'Needs Attention') {
+        if (
+          listing.auctionStatus !== 'Needs Attention' &&
+          listing.auctionStatus !== 'Unassigned'
+        ) {
+          return false
+        }
+      }
+      // Special case: "Pending" includes multiple pending-related statuses
+      else if (filterStatus === 'Pending') {
+        if (
+          listing.auctionStatus !== 'Pending' &&
+          listing.auctionStatus !== 'Queued' &&
+          listing.auctionStatus !== 'Pending Payment' &&
+          listing.auctionStatus !== 'Pending Pickup' &&
+          listing.auctionStatus !== 'Submitted'
+        ) {
+          return false
+        }
+      } else if (listing.auctionStatus !== filterStatus) {
+        return false
+      }
     }
 
     // Filter by Date Range
@@ -593,7 +702,16 @@ function Dashboard() {
   ])
 
   // Group listings by auction for auctions view
-  const groupedByAuction = React.useMemo(() => {
+  const groupedByAuction = React.useMemo<
+    Array<{
+      auctionName: string
+      listings: Array<AuctionListing>
+      totalListings: number
+      totalStartingBid: number
+      totalCurrentBid: number
+      totalBids: number
+    }>
+  >(() => {
     const groups = new Map<string, Array<AuctionListing>>()
 
     sortedListings.forEach((listing) => {
@@ -623,6 +741,42 @@ function Dashboard() {
       })
   }, [sortedListings])
 
+  // Helper function to auto-expand accordions containing a specific status
+  const autoExpandAccordionsForStatus = React.useCallback(
+    (status: string) => {
+      if (viewMode !== 'auctions') return
+
+      // Calculate which auctions to expand based on current data
+      const auctionsToExpand = groupedByAuction
+        .filter((auction) => {
+          return auction.listings.some((listing) => {
+            // Special case: "Needs Attention" includes "Unassigned"
+            if (status === 'Needs Attention') {
+              return (
+                listing.auctionStatus === 'Needs Attention' ||
+                listing.auctionStatus === 'Unassigned'
+              )
+            }
+            // Special case: "Pending" includes multiple pending statuses
+            if (status === 'Pending') {
+              return (
+                listing.auctionStatus === 'Pending' ||
+                listing.auctionStatus === 'Queued' ||
+                listing.auctionStatus === 'Pending Payment' ||
+                listing.auctionStatus === 'Pending Pickup' ||
+                listing.auctionStatus === 'Submitted'
+              )
+            }
+            return listing.auctionStatus === status
+          })
+        })
+        .map((auction) => auction.auctionName)
+
+      setExpandedAccordions(auctionsToExpand)
+    },
+    [groupedByAuction, viewMode],
+  )
+
   // All stats for tabs
   const stats = {
     'pre-auction': auctionListings.filter(
@@ -650,9 +804,9 @@ function Dashboard() {
     ).length,
   }
 
-  // Status tallies across all tabs (based on filtered results)
+  // Status tallies for the current active tab only (based on filtered results)
   const statusTallies = {
-    pending: allFilteredListings.filter(
+    pending: filteredListings.filter(
       (l) =>
         l.auctionStatus === 'Pending' ||
         l.auctionStatus === 'Queued' ||
@@ -660,17 +814,65 @@ function Dashboard() {
         l.auctionStatus === 'Pending Pickup' ||
         l.auctionStatus === 'Submitted',
     ).length,
-    needsAttention: allFilteredListings.filter(
+    needsAttention: filteredListings.filter(
       (l) =>
         l.auctionStatus === 'Needs Attention' ||
         l.auctionStatus === 'Unassigned',
     ).length,
-    published: allFilteredListings.filter(
+    published: filteredListings.filter(
       (l) => l.auctionStatus === 'Published' || l.auctionStatus === 'Active',
     ).length,
-    completed: allFilteredListings.filter(
+    completed: filteredListings.filter((l) => l.auctionStatus === 'Completed')
+      .length,
+  }
+
+  // Global status tallies across ALL tabs (for cumulative badges)
+  // Uses allFilteredListingsNoStatus so counts don't change when badge clicked
+  const allStatusTallies = {
+    pending: allFilteredListingsNoStatus.filter(
+      (l) =>
+        l.auctionStatus === 'Pending' ||
+        l.auctionStatus === 'Queued' ||
+        l.auctionStatus === 'Pending Payment' ||
+        l.auctionStatus === 'Pending Pickup' ||
+        l.auctionStatus === 'Submitted',
+    ).length,
+    needsAttention: allFilteredListingsNoStatus.filter(
+      (l) =>
+        l.auctionStatus === 'Needs Attention' ||
+        l.auctionStatus === 'Unassigned',
+    ).length,
+    published: allFilteredListingsNoStatus.filter(
+      (l) => l.auctionStatus === 'Published',
+    ).length,
+    active: allFilteredListingsNoStatus.filter(
+      (l) => l.auctionStatus === 'Active',
+    ).length,
+    completed: allFilteredListingsNoStatus.filter(
       (l) => l.auctionStatus === 'Completed',
     ).length,
+  }
+
+  // Initial badge counts (before any filtering) - for determining if badge should be shown
+  const initialBadgeCounts = {
+    pending: auctionListings.filter(
+      (l) =>
+        l.auctionStatus === 'Pending' ||
+        l.auctionStatus === 'Queued' ||
+        l.auctionStatus === 'Pending Payment' ||
+        l.auctionStatus === 'Pending Pickup' ||
+        l.auctionStatus === 'Submitted',
+    ).length,
+    needsAttention: auctionListings.filter(
+      (l) =>
+        l.auctionStatus === 'Needs Attention' ||
+        l.auctionStatus === 'Unassigned',
+    ).length,
+    published: auctionListings.filter((l) => l.auctionStatus === 'Published')
+      .length,
+    active: auctionListings.filter((l) => l.auctionStatus === 'Active').length,
+    completed: auctionListings.filter((l) => l.auctionStatus === 'Completed')
+      .length,
   }
 
   const formatCurrency = (amount: number) => {
@@ -704,7 +906,7 @@ function Dashboard() {
           {/* Auction Listings Table */}
           <Card className="scroll-mt-4">
             <CardHeader>
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between gap-2">
                 <div>
                   <CardTitle>Browse Auctions and Lots</CardTitle>
                   <CardDescription>
@@ -717,19 +919,352 @@ function Dashboard() {
             <CardContent>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsContent value={activeTab} className="mt-0">
+                  {/* View Mode Toggle */}
+                  <div className="flex items-center justify-center mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-muted-foreground">
+                        View:
+                      </span>
+                      <Tabs
+                        value={viewMode}
+                        onValueChange={(value) =>
+                          setViewMode(value as 'listings' | 'auctions')
+                        }
+                        className="w-auto"
+                      >
+                        <TabsList className="h-9">
+                          <TabsTrigger
+                            value="listings"
+                            className="text-xs px-3 cursor-pointer"
+                          >
+                            Lots
+                          </TabsTrigger>
+                          <TabsTrigger
+                            value="auctions"
+                            className="text-xs px-3 cursor-pointer"
+                          >
+                            Auctions
+                          </TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                    </div>
+                  </div>
+
+                  {/* Badges and Tabs - Badges on left, Tabs on right */}
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+                    {/* Status Tallies - All Badges Shown */}
+                    <div className="flex flex-wrap items-center gap-2 justify-start">
+                      <TooltipProvider>
+                        {/* Needs Attention Badge */}
+                        {initialBadgeCounts.needsAttention > 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge
+                                variant="destructive"
+                                className="gap-1 cursor-pointer transition-all hover:scale-105"
+                                style={{
+                                  opacity:
+                                    filterStatus &&
+                                    filterStatus !== 'Needs Attention' &&
+                                    filterStatus !== 'Unassigned'
+                                      ? 0.4
+                                      : 1,
+                                }}
+                                onClick={() => {
+                                  const newStatus =
+                                    filterStatus === 'Needs Attention' ||
+                                    filterStatus === 'Unassigned'
+                                      ? ''
+                                      : 'Needs Attention'
+                                  setFilterStatus(newStatus)
+                                  if (newStatus) {
+                                    setFilterAccordionValue('item-1')
+                                    setActiveTab('pre-auction')
+                                    // Auto-expand relevant accordions in auction view
+                                    setTimeout(
+                                      () =>
+                                        autoExpandAccordionsForStatus(
+                                          newStatus,
+                                        ),
+                                      0,
+                                    )
+                                  }
+                                }}
+                              >
+                                Needs Attention
+                                <span className="ml-1 font-semibold">
+                                  {allStatusTallies.needsAttention}
+                                </span>
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Click to filter. Items requiring immediate action
+                              or unassigned lots
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+
+                        {/* Published Badge */}
+                        {initialBadgeCounts.published > 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge
+                                variant="information"
+                                className="gap-1 cursor-pointer transition-all hover:scale-105"
+                                style={{
+                                  opacity:
+                                    filterStatus && filterStatus !== 'Published'
+                                      ? 0.4
+                                      : 1,
+                                }}
+                                onClick={() => {
+                                  const newStatus =
+                                    filterStatus === 'Published'
+                                      ? ''
+                                      : 'Published'
+                                  setFilterStatus(newStatus)
+                                  if (newStatus) {
+                                    setFilterAccordionValue('item-1')
+                                    setActiveTab('pre-auction')
+                                    // Auto-expand relevant accordions in auction view
+                                    setTimeout(
+                                      () =>
+                                        autoExpandAccordionsForStatus(
+                                          newStatus,
+                                        ),
+                                      0,
+                                    )
+                                  }
+                                }}
+                              >
+                                Published
+                                <span className="ml-1 font-semibold">
+                                  {allStatusTallies.published}
+                                </span>
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Click to filter. Approved and ready to go live
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+
+                        {/* Active Badge */}
+                        {initialBadgeCounts.active > 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge
+                                variant="brand"
+                                className="gap-1 cursor-pointer transition-all hover:scale-105"
+                                style={{
+                                  opacity:
+                                    filterStatus && filterStatus !== 'Active'
+                                      ? 0.4
+                                      : 1,
+                                }}
+                                onClick={() => {
+                                  const newStatus =
+                                    filterStatus === 'Active' ? '' : 'Active'
+                                  setFilterStatus(newStatus)
+                                  if (newStatus) {
+                                    setFilterAccordionValue('item-1')
+                                    setActiveTab('live-auction')
+                                    // Auto-expand relevant accordions in auction view
+                                    setTimeout(
+                                      () =>
+                                        autoExpandAccordionsForStatus(
+                                          newStatus,
+                                        ),
+                                      0,
+                                    )
+                                  }
+                                }}
+                              >
+                                Active
+                                <span className="ml-1 font-semibold">
+                                  {allStatusTallies.active}
+                                </span>
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Click to filter. Currently accepting bids
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+
+                        {/* Pending Badge */}
+                        {initialBadgeCounts.pending > 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge
+                                variant="warning"
+                                className="gap-1 cursor-pointer transition-all hover:scale-105"
+                                style={{
+                                  opacity:
+                                    filterStatus && filterStatus !== 'Pending'
+                                      ? 0.4
+                                      : 1,
+                                }}
+                                onClick={() => {
+                                  const newStatus =
+                                    filterStatus === 'Pending' ? '' : 'Pending'
+                                  setFilterStatus(newStatus)
+                                  if (newStatus) {
+                                    setFilterAccordionValue('item-1')
+                                    setActiveTab('post-auction')
+                                    // Auto-expand relevant accordions in auction view
+                                    setTimeout(
+                                      () =>
+                                        autoExpandAccordionsForStatus(
+                                          newStatus,
+                                        ),
+                                      0,
+                                    )
+                                  }
+                                }}
+                              >
+                                Pending
+                                <span className="ml-1 font-semibold">
+                                  {allStatusTallies.pending}
+                                </span>
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Click to filter. Includes Submitted, Pending,
+                              Queued, Pending Payment, Pending Pickup
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+
+                        {/* Completed Badge */}
+                        {initialBadgeCounts.completed > 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge
+                                variant="neutral"
+                                className="gap-1 cursor-pointer transition-all hover:scale-105"
+                                style={{
+                                  opacity:
+                                    filterStatus && filterStatus !== 'Completed'
+                                      ? 0.4
+                                      : 1,
+                                }}
+                                onClick={() => {
+                                  const newStatus =
+                                    filterStatus === 'Completed'
+                                      ? ''
+                                      : 'Completed'
+                                  setFilterStatus(newStatus)
+                                  if (newStatus) {
+                                    setFilterAccordionValue('item-1')
+                                    setActiveTab('post-auction')
+                                    // Auto-expand relevant accordions in auction view
+                                    setTimeout(
+                                      () =>
+                                        autoExpandAccordionsForStatus(
+                                          newStatus,
+                                        ),
+                                      0,
+                                    )
+                                  }
+                                }}
+                              >
+                                Completed
+                                <span className="ml-1 font-semibold">
+                                  {allStatusTallies.completed}
+                                </span>
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Click to filter. All payment and pickup finalized
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </TooltipProvider>
+                    </div>
+                    {/* Tabs on the right */}
+                    <TabsList className="rounded-[12px] w-full lg:w-auto">
+                      <TabsTrigger
+                        value="pre-auction"
+                        className="gap-2 cursor-pointer rounded-[10px] flex-1 lg:flex-initial"
+                      >
+                        Pre-Auction
+                        <Badge
+                          variant="secondary"
+                          style={{
+                            backgroundColor: hasActiveFilters
+                              ? 'hsl(48 96% 53%)'
+                              : 'color-mix(in oklab, var(--muted-foreground) 30%, transparent)',
+                          }}
+                          className={
+                            hasActiveFilters ? 'text-black' : 'text-foreground'
+                          }
+                        >
+                          {hasActiveFilters
+                            ? filteredStats['pre-auction']
+                            : stats['pre-auction']}
+                        </Badge>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="live-auction"
+                        className="gap-2 cursor-pointer rounded-[10px] flex-1 lg:flex-initial"
+                      >
+                        Live Auction
+                        <Badge
+                          variant="secondary"
+                          style={{
+                            backgroundColor: hasActiveFilters
+                              ? 'hsl(48 96% 53%)'
+                              : 'color-mix(in oklab, var(--muted-foreground) 30%, transparent)',
+                          }}
+                          className={
+                            hasActiveFilters ? 'text-black' : 'text-foreground'
+                          }
+                        >
+                          {hasActiveFilters
+                            ? filteredStats['live-auction']
+                            : stats['live-auction']}
+                        </Badge>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="post-auction"
+                        className="gap-2 cursor-pointer rounded-[10px] flex-1 lg:flex-initial"
+                      >
+                        Post-Auction
+                        <Badge
+                          variant="secondary"
+                          style={{
+                            backgroundColor: hasActiveFilters
+                              ? 'hsl(48 96% 53%)'
+                              : 'color-mix(in oklab, var(--muted-foreground) 30%, transparent)',
+                          }}
+                          className={
+                            hasActiveFilters ? 'text-black' : 'text-foreground'
+                          }
+                        >
+                          {hasActiveFilters
+                            ? filteredStats['post-auction']
+                            : stats['post-auction']}
+                        </Badge>
+                      </TabsTrigger>
+                    </TabsList>{' '}
+                  </div>
+
                   {/* Filters Section */}
                   <Accordion
                     type="single"
                     collapsible
-                    className="w-full"
-                    defaultValue="item-1"
+                    className="w-full mb-4"
+                    value={filterAccordionValue}
+                    onValueChange={setFilterAccordionValue}
                   >
                     <AccordionItem
                       value="item-1"
-                      className="mb-4 border rounded-lg bg-muted"
+                      className="border rounded-lg bg-muted group"
+                      style={{ borderBottomWidth: '1px' }}
                     >
-                      <AccordionTrigger className="px-4 hover:no-underline cursor-pointer">
-                        <div className="flex items-center gap-2">
+                      <AccordionTrigger className="px-4 py-2 hover:no-underline cursor-pointer w-full items-center">
+                        <div className="flex items-center gap-2 flex-1">
                           <Filter className="h-4 w-4" />
                           <span>Filter</span>
                           {hasActiveFilters && (
@@ -742,30 +1277,47 @@ function Dashboard() {
                                   filterAuctionId,
                                   filterTitle,
                                   filterSalesRep,
+                                  filterStatus && filterStatus !== 'all'
+                                    ? filterStatus
+                                    : '',
                                   dateRange?.from || dateRange?.to,
                                 ].filter(Boolean).length
                               }
                             </Badge>
                           )}
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (hasActiveFilters) {
+                                clearFilters()
+                              }
+                            }}
+                            className="h-7 text-xs px-2 ml-2 inline-flex items-center justify-center rounded-md font-medium transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                            style={{
+                              opacity: hasActiveFilters ? 1 : 0,
+                              pointerEvents: hasActiveFilters ? 'auto' : 'none',
+                            }}
+                            role="button"
+                            tabIndex={hasActiveFilters ? 0 : -1}
+                            onKeyDown={(e) => {
+                              if (
+                                hasActiveFilters &&
+                                (e.key === 'Enter' || e.key === ' ')
+                              ) {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                clearFilters()
+                              }
+                            }}
+                          >
+                            <X className="h-3 w-3 mr-1" />
+                            Clear All
+                          </span>
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="px-4 pb-4">
                         <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <Separator className="flex-1" />
-                            {hasActiveFilters && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={clearFilters}
-                                className="h-8 text-xs ml-4"
-                              >
-                                <X className="h-3 w-3 mr-1" />
-                                Clear All Filters
-                              </Button>
-                            )}
-                          </div>
-                          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                             {/* Auction Filter */}
                             <div className="space-y-2 min-w-[200px]">
                               <Label
@@ -774,7 +1326,7 @@ function Dashboard() {
                               >
                                 Auction
                               </Label>
-                              <div className="relative">
+                              <div className="relative mb-0">
                                 <Input
                                   id="filter-auction-id"
                                   placeholder="Search by auction..."
@@ -803,12 +1355,12 @@ function Dashboard() {
                               </datalist>
                             </div>
 
-                            {/* Auction Title Filter */}
+                            {/* Lot Title Filter */}
                             <div className="space-y-2 min-w-[200px]">
                               <Label htmlFor="filter-title" className="text-xs">
-                                Auction Title
+                                Lot Title
                               </Label>
-                              <div className="relative">
+                              <div className="relative mb-0">
                                 <Input
                                   id="filter-title"
                                   placeholder="Search by title..."
@@ -837,6 +1389,55 @@ function Dashboard() {
                               </datalist>
                             </div>
 
+                            {/* Status Filter */}
+                            <div className="space-y-2 min-w-[200px]">
+                              <Label
+                                htmlFor="filter-status"
+                                className="text-xs"
+                              >
+                                Status
+                              </Label>
+                              <Select
+                                value={filterStatus}
+                                onValueChange={setFilterStatus}
+                              >
+                                <SelectTrigger className="h-9 w-full bg-background border-neutral-400">
+                                  <SelectValue placeholder="All statuses" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">
+                                    All statuses
+                                  </SelectItem>
+                                  <SelectItem value="Published">
+                                    Published
+                                  </SelectItem>
+                                  <SelectItem value="Active">Active</SelectItem>
+                                  <SelectItem value="Pending">
+                                    Pending
+                                  </SelectItem>
+                                  <SelectItem value="Needs Attention">
+                                    Needs Attention
+                                  </SelectItem>
+                                  <SelectItem value="Unassigned">
+                                    Unassigned
+                                  </SelectItem>
+                                  <SelectItem value="Completed">
+                                    Completed
+                                  </SelectItem>
+                                  <SelectItem value="Submitted">
+                                    Submitted
+                                  </SelectItem>
+                                  <SelectItem value="Queued">Queued</SelectItem>
+                                  <SelectItem value="Pending Payment">
+                                    Pending Payment
+                                  </SelectItem>
+                                  <SelectItem value="Pending Pickup">
+                                    Pending Pickup
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
                             {/* Sales Rep Filter */}
                             <div className="space-y-2 min-w-[200px]">
                               <Label
@@ -845,7 +1446,7 @@ function Dashboard() {
                               >
                                 Sales Rep
                               </Label>
-                              <div className="relative">
+                              <div className="relative mb-0">
                                 <Input
                                   id="filter-sales-rep"
                                   placeholder="Search by rep..."
@@ -930,180 +1531,6 @@ function Dashboard() {
                       </AccordionContent>
                     </AccordionItem>
                   </Accordion>
-
-                  {/* View Mode Toggle */}
-                  <div className="flex items-center justify-center mb-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-muted-foreground">
-                        View:
-                      </span>
-                      <Tabs
-                        value={viewMode}
-                        onValueChange={(value) =>
-                          setViewMode(value as 'listings' | 'auctions')
-                        }
-                        className="w-auto"
-                      >
-                        <TabsList className="h-9">
-                          <TabsTrigger
-                            value="listings"
-                            className="text-xs px-3 cursor-pointer"
-                          >
-                            Lots
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="auctions"
-                            className="text-xs px-3 cursor-pointer"
-                          >
-                            Auctions
-                          </TabsTrigger>
-                        </TabsList>
-                      </Tabs>
-                    </div>
-                  </div>
-
-                  {/* Tabs and Status Tallies - Moved below filters */}
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-                    <TabsList className="rounded-xl w-full lg:w-auto">
-                      <TabsTrigger
-                        value="pre-auction"
-                        className="gap-2 cursor-pointer rounded-xl flex-1 lg:flex-initial"
-                      >
-                        Pre-Auction
-                        <Badge
-                          variant="secondary"
-                          style={{
-                            backgroundColor: hasActiveFilters
-                              ? 'hsl(48 96% 53%)'
-                              : 'color-mix(in oklab, var(--muted-foreground) 30%, transparent)',
-                          }}
-                          className={
-                            hasActiveFilters ? 'text-black' : 'text-foreground'
-                          }
-                        >
-                          {hasActiveFilters
-                            ? filteredStats['pre-auction']
-                            : stats['pre-auction']}
-                        </Badge>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="live-auction"
-                        className="gap-2 cursor-pointer rounded-xl flex-1 lg:flex-initial"
-                      >
-                        Live Auction
-                        <Badge
-                          variant="secondary"
-                          style={{
-                            backgroundColor: hasActiveFilters
-                              ? 'hsl(48 96% 53%)'
-                              : 'color-mix(in oklab, var(--muted-foreground) 30%, transparent)',
-                          }}
-                          className={
-                            hasActiveFilters ? 'text-black' : 'text-foreground'
-                          }
-                        >
-                          {hasActiveFilters
-                            ? filteredStats['live-auction']
-                            : stats['live-auction']}
-                        </Badge>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="post-auction"
-                        className="gap-2 cursor-pointer rounded-xl flex-1 lg:flex-initial"
-                      >
-                        Post-Auction
-                        <Badge
-                          variant="secondary"
-                          style={{
-                            backgroundColor: hasActiveFilters
-                              ? 'hsl(48 96% 53%)'
-                              : 'color-mix(in oklab, var(--muted-foreground) 30%, transparent)',
-                          }}
-                          className={
-                            hasActiveFilters ? 'text-black' : 'text-foreground'
-                          }
-                        >
-                          {hasActiveFilters
-                            ? filteredStats['post-auction']
-                            : stats['post-auction']}
-                        </Badge>
-                      </TabsTrigger>
-                    </TabsList>
-
-                    {/* Status Tallies */}
-                    <div className="flex flex-wrap items-center gap-2 justify-start lg:justify-end">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge
-                              variant="warning"
-                              className="gap-1 cursor-help"
-                            >
-                              Pending
-                              <span className="ml-1 font-semibold">
-                                {statusTallies.pending}
-                              </span>
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            Includes Pending, Queued, Pending Payment and
-                            Pending Pickup
-                          </TooltipContent>
-                        </Tooltip>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge
-                              variant="destructive"
-                              className="gap-1 cursor-help"
-                            >
-                              Needs Attention
-                              <span className="ml-1 font-semibold">
-                                {statusTallies.needsAttention}
-                              </span>
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            Includes Pre, Live and Post-Auction
-                          </TooltipContent>
-                        </Tooltip>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge
-                              variant="information"
-                              className="gap-1 cursor-help"
-                            >
-                              Published
-                              <span className="ml-1 font-semibold">
-                                {statusTallies.published}
-                              </span>
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            All approved auctions that are ready to go Live
-                          </TooltipContent>
-                        </Tooltip>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge
-                              variant="neutral"
-                              className="gap-1 cursor-help"
-                            >
-                              Completed
-                              <span className="ml-1 font-semibold">
-                                {statusTallies.completed}
-                              </span>
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            All auctions that have finished, paid and picked up
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </div>
 
                   {/* Listings View */}
                   {viewMode === 'listings' && (
@@ -1229,15 +1656,17 @@ function Dashboard() {
                                 onClick={() => openListingModal(listing)}
                               >
                                 <TableCell className="font-medium">
-                                  <TooltipProvider>
-                                    <TruncatedCell
-                                      text={
-                                        listing.auctionName === 'Unassigned'
-                                          ? 'No Auction Assigned'
-                                          : listing.auctionName
-                                      }
-                                    />
-                                  </TooltipProvider>
+                                  {listing.auctionName === 'Unassigned' ? (
+                                    <span className="italic text-muted-foreground">
+                                      No Auction Assigned
+                                    </span>
+                                  ) : (
+                                    <TooltipProvider>
+                                      <TruncatedCell
+                                        text={listing.auctionName}
+                                      />
+                                    </TooltipProvider>
+                                  )}
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex flex-col">
@@ -1338,264 +1767,368 @@ function Dashboard() {
                             : 'No auctions found in this category'}
                         </div>
                       ) : (
-                        <Accordion type="multiple" className="w-full space-y-3">
+                        <Accordion
+                          type="multiple"
+                          className="w-full space-y-3"
+                          value={expandedAccordions}
+                          onValueChange={setExpandedAccordions}
+                        >
                           {groupedByAuction.map((auction) => (
-                            <AccordionItem
-                              key={auction.auctionName}
-                              value={auction.auctionName}
-                              className="border rounded-lg bg-background hover:bg-muted/50 transition-colors cursor-pointer group"
-                            >
-                              <AccordionTrigger className="px-6 py-4 hover:no-underline cursor-pointer w-full">
-                                <div className="flex items-center justify-between w-full gap-4">
-                                  {/* Left: Auction Name & Count */}
-                                  <div className="flex flex-col items-start gap-1 flex-1">
-                                    <span className="font-semibold text-base">
-                                      {auction.auctionName === 'Unassigned'
-                                        ? 'Unassigned Lots'
-                                        : auction.auctionName}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground font-normal">
-                                      {auction.totalListings}{' '}
-                                      {auction.totalListings === 1
-                                        ? 'listing'
-                                        : 'listings'}
-                                      {activeTab !== 'pre-auction' &&
-                                        ` • ${auction.totalBids} ${auction.totalBids === 1 ? 'bid' : 'bids'}`}
-                                    </span>
-                                  </div>
-
-                                  {/* Center: Dates */}
-                                  <div className="flex items-center gap-4 flex-1 justify-center">
-                                    {auction.auctionName !== 'Unassigned' &&
-                                    auction.listings[0]?.endDate ? (
-                                      <>
-                                        <div className="text-center">
-                                          <div className="text-xs text-muted-foreground">
-                                            {activeTab === 'pre-auction'
-                                              ? 'Opens'
-                                              : 'Opened'}
-                                          </div>
-                                          <div className="text-sm font-medium">
-                                            {format(
-                                              new Date(
-                                                auction.listings[0].endDate,
-                                              ).setDate(
-                                                new Date(
-                                                  auction.listings[0].endDate,
-                                                ).getDate() - 14,
-                                              ),
-                                              'MMM dd, yyyy',
-                                            )}
-                                          </div>
-                                        </div>
-                                        <span className="text-muted-foreground">
-                                          →
-                                        </span>
-                                        <div className="text-center">
-                                          <div className="text-xs text-muted-foreground">
-                                            {activeTab === 'pre-auction'
-                                              ? 'Closes'
-                                              : activeTab === 'post-auction'
-                                                ? 'Closed'
-                                                : 'Closes'}
-                                          </div>
-                                          <div className="text-sm font-medium">
-                                            {format(
-                                              new Date(
-                                                auction.listings[0].endDate,
-                                              ),
-                                              'MMM dd, yyyy',
-                                            )}
-                                          </div>
-                                        </div>
-                                      </>
-                                    ) : (
-                                      <span className="text-sm text-muted-foreground">
-                                        No dates assigned
+                            <React.Fragment key={auction.auctionName}>
+                              <AccordionItem
+                                value={auction.auctionName}
+                                className="border rounded-lg bg-background hover:bg-muted/50 transition-colors cursor-pointer group"
+                                style={{ borderBottomWidth: '1px' }}
+                              >
+                                <AccordionTrigger className="px-6 py-4 hover:no-underline cursor-pointer w-full items-center">
+                                  <div className="flex flex-col md:flex-row items-center justify-between w-full gap-4">
+                                    {/* Left: Auction Name & Count */}
+                                    <div className="flex flex-col items-start gap-1 flex-1">
+                                      <span
+                                        className={`text-base ${auction.auctionName === 'Unassigned' ? 'font-semibold italic' : 'font-semibold'}`}
+                                      >
+                                        {auction.auctionName === 'Unassigned'
+                                          ? 'Unassigned Lots'
+                                          : auction.auctionName}
                                       </span>
-                                    )}
-                                  </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-muted-foreground font-normal">
+                                          {auction.totalListings}{' '}
+                                          {auction.totalListings === 1
+                                            ? 'listing'
+                                            : 'listings'}
+                                          {activeTab !== 'pre-auction' &&
+                                            ` • ${auction.totalBids} ${auction.totalBids === 1 ? 'bid' : 'bids'}`}
+                                        </span>
+                                        {/* Status badges */}
+                                        <div className="flex items-center gap-1">
+                                          {(() => {
+                                            // Count listings by status
+                                            const statusCounts: Record<
+                                              string,
+                                              number
+                                            > = {}
+                                            auction.listings.forEach(
+                                              (listing) => {
+                                                const status =
+                                                  listing.auctionStatus
+                                                statusCounts[status] =
+                                                  (statusCounts[status] || 0) +
+                                                  1
+                                              },
+                                            )
 
-                                  {/* Right: Bid Totals & Expand Icon */}
-                                  <div className="flex items-center gap-6 flex-1 justify-end">
-                                    {/* Total Target (always shown) */}
-                                    <div className="text-right">
-                                      <div className="text-xs text-muted-foreground">
-                                        Total Target
-                                      </div>
-                                      <div className="text-sm font-semibold">
-                                        {formatCurrency(
-                                          auction.totalStartingBid,
-                                        )}
+                                            // Map status to badge variant
+                                            const getStatusVariant = (
+                                              status: string,
+                                            ):
+                                              | 'default'
+                                              | 'destructive'
+                                              | 'information'
+                                              | 'brand'
+                                              | 'warning'
+                                              | 'neutral' => {
+                                              if (
+                                                status === 'Needs Attention' ||
+                                                status === 'Unassigned'
+                                              )
+                                                return 'destructive'
+                                              if (status === 'Published')
+                                                return 'information'
+                                              if (status === 'Active')
+                                                return 'brand'
+                                              if (status === 'Completed')
+                                                return 'neutral'
+                                              if (
+                                                status === 'Pending' ||
+                                                status === 'Queued' ||
+                                                status === 'Pending Payment' ||
+                                                status === 'Pending Pickup' ||
+                                                status === 'Submitted'
+                                              )
+                                                return 'warning'
+                                              return 'default'
+                                            }
+
+                                            return Object.entries(statusCounts)
+                                              .sort(([statusA], [statusB]) => {
+                                                // Sort order: Needs Attention, Pending statuses, Published, Active, Completed, others
+                                                const order = [
+                                                  'Needs Attention',
+                                                  'Unassigned',
+                                                  'Pending',
+                                                  'Queued',
+                                                  'Submitted',
+                                                  'Pending Payment',
+                                                  'Pending Pickup',
+                                                  'Published',
+                                                  'Active',
+                                                  'Completed',
+                                                ]
+                                                const indexA =
+                                                  order.indexOf(statusA)
+                                                const indexB =
+                                                  order.indexOf(statusB)
+                                                if (
+                                                  indexA === -1 &&
+                                                  indexB === -1
+                                                )
+                                                  return statusA.localeCompare(
+                                                    statusB,
+                                                  )
+                                                if (indexA === -1) return 1
+                                                if (indexB === -1) return -1
+                                                return indexA - indexB
+                                              })
+                                              .map(([status, count]) => (
+                                                <Badge
+                                                  key={status}
+                                                  variant={getStatusVariant(
+                                                    status,
+                                                  )}
+                                                  className="h-4 px-1.5 text-[10px] font-semibold"
+                                                >
+                                                  {count}
+                                                </Badge>
+                                              ))
+                                          })()}
+                                        </div>
                                       </div>
                                     </div>
 
-                                    {/* Actual Total (live and post-auction only) */}
-                                    {activeTab !== 'pre-auction' && (
+                                    {/* Center: Dates */}
+                                    <div className="flex items-center gap-4 flex-1 justify-center">
+                                      {auction.auctionName !== 'Unassigned' &&
+                                      auction.listings[0]?.endDate ? (
+                                        <>
+                                          <div className="text-center">
+                                            <div className="text-xs text-muted-foreground">
+                                              {activeTab === 'pre-auction'
+                                                ? 'Opens'
+                                                : 'Opened'}
+                                            </div>
+                                            <div className="text-sm font-medium">
+                                              {format(
+                                                new Date(
+                                                  auction.listings[0].endDate,
+                                                ).setDate(
+                                                  new Date(
+                                                    auction.listings[0].endDate,
+                                                  ).getDate() - 14,
+                                                ),
+                                                'MMM dd, yyyy',
+                                              )}
+                                            </div>
+                                          </div>
+                                          <span className="text-muted-foreground">
+                                            →
+                                          </span>
+                                          <div className="text-center">
+                                            <div className="text-xs text-muted-foreground">
+                                              {activeTab === 'pre-auction'
+                                                ? 'Closes'
+                                                : activeTab === 'post-auction'
+                                                  ? 'Closed'
+                                                  : 'Closes'}
+                                            </div>
+                                            <div className="text-sm font-medium">
+                                              {format(
+                                                new Date(
+                                                  auction.listings[0].endDate,
+                                                ),
+                                                'MMM dd, yyyy',
+                                              )}
+                                            </div>
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <span className="text-sm text-muted-foreground">
+                                          No dates assigned
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Right: Bid Totals & Expand Icon */}
+                                    <div className="flex items-center gap-6 flex-1 justify-end">
+                                      {/* Total Target (always shown) */}
                                       <div className="text-right">
                                         <div className="text-xs text-muted-foreground">
-                                          Actual Total
+                                          Total Target
                                         </div>
                                         <div className="text-sm font-semibold">
                                           {formatCurrency(
-                                            auction.totalCurrentBid,
+                                            auction.totalStartingBid,
                                           )}
                                         </div>
                                       </div>
-                                    )}
 
-                                    {/* Chevron with rotation */}
-                                    <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 flex-shrink-0 cursor-pointer group-data-[state=open]:rotate-180" />
+                                      {/* Actual Total (live and post-auction only) */}
+                                      {activeTab !== 'pre-auction' && (
+                                        <div className="text-right">
+                                          <div className="text-xs text-muted-foreground">
+                                            Actual Total
+                                          </div>
+                                          <div className="text-sm font-semibold">
+                                            {formatCurrency(
+                                              auction.totalCurrentBid,
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              </AccordionTrigger>
-                              <AccordionContent className="px-4 pb-4">
-                                <div className="rounded-md border mt-2">
-                                  <Table>
-                                    <TableHeader className="bg-muted">
-                                      <TableRow>
-                                        <TableHead>Lot Title</TableHead>
-                                        <TableHead>Category</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        {activeTab !== 'post-auction' && (
-                                          <TableHead>Opening Bid</TableHead>
-                                        )}
-                                        {activeTab !== 'pre-auction' && (
-                                          <TableHead>
-                                            {activeTab === 'post-auction'
-                                              ? 'Winning Bid'
-                                              : 'Current Bid'}
-                                          </TableHead>
-                                        )}
-                                        {activeTab !== 'pre-auction' && (
-                                          <TableHead className="text-center">
-                                            Bids
-                                          </TableHead>
-                                        )}
-                                        <TableHead>
-                                          {activeTab === 'pre-auction'
-                                            ? 'Scheduled Date'
-                                            : 'End Date'}
-                                        </TableHead>
-                                        <TableHead>Location</TableHead>
-                                        <TableHead>Sales Rep</TableHead>
-                                        <TableHead className="text-right">
-                                          Actions
-                                        </TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {auction.listings.map((listing) => (
-                                        <TableRow
-                                          key={listing.id}
-                                          className="cursor-pointer"
-                                          onClick={() =>
-                                            openListingModal(listing)
-                                          }
-                                        >
-                                          <TableCell>
-                                            <div className="flex flex-col">
-                                              <span className="font-medium">
-                                                <TooltipProvider>
-                                                  <TruncatedCell
-                                                    text={listing.title}
-                                                  />
-                                                </TooltipProvider>
-                                              </span>
-                                              <span className="text-xs text-muted-foreground">
-                                                <TooltipProvider>
-                                                  <TruncatedCell
-                                                    text={listing.seller}
-                                                  />
-                                                </TooltipProvider>
-                                              </span>
-                                            </div>
-                                          </TableCell>
-                                          <TableCell>
-                                            <Badge variant="outline">
-                                              <TooltipProvider>
-                                                <TruncatedCell
-                                                  text={listing.category}
-                                                />
-                                              </TooltipProvider>
-                                            </Badge>
-                                          </TableCell>
-                                          <TableCell>
-                                            <Badge
-                                              variant={getStatusBadgeVariant(
-                                                listing.auctionStatus,
-                                              )}
-                                            >
-                                              <TooltipProvider>
-                                                <TruncatedCell
-                                                  text={
-                                                    listing.auctionStatus ===
-                                                    'Unassigned'
-                                                      ? 'Unassigned Auction'
-                                                      : listing.auctionStatus
-                                                  }
-                                                />
-                                              </TooltipProvider>
-                                            </Badge>
-                                          </TableCell>
+                                </AccordionTrigger>
+                                <AccordionContent className="px-4 pb-4">
+                                  <div className="rounded-md border mt-2">
+                                    <Table>
+                                      <TableHeader className="bg-muted">
+                                        <TableRow>
+                                          <TableHead>Lot Title</TableHead>
+                                          <TableHead>Category</TableHead>
+                                          <TableHead>Status</TableHead>
                                           {activeTab !== 'post-auction' && (
-                                            <TableCell>
-                                              {formatCurrency(
-                                                listing.startingBid,
-                                              )}
-                                            </TableCell>
+                                            <TableHead>Opening Bid</TableHead>
                                           )}
                                           {activeTab !== 'pre-auction' && (
-                                            <TableCell className="font-semibold">
-                                              {formatCurrency(
-                                                listing.currentBid,
-                                              )}
-                                            </TableCell>
+                                            <TableHead>
+                                              {activeTab === 'post-auction'
+                                                ? 'Winning Bid'
+                                                : 'Current Bid'}
+                                            </TableHead>
                                           )}
                                           {activeTab !== 'pre-auction' && (
-                                            <TableCell className="text-center">
-                                              {listing.bids}
-                                            </TableCell>
+                                            <TableHead className="text-center">
+                                              Bids
+                                            </TableHead>
                                           )}
-                                          <TableCell>
-                                            {formatDate(listing.endDate)}
-                                          </TableCell>
-                                          <TableCell>
-                                            <TooltipProvider>
-                                              <TruncatedCell
-                                                text={listing.location}
-                                              />
-                                            </TooltipProvider>
-                                          </TableCell>
-                                          <TableCell>
-                                            <TooltipProvider>
-                                              <TruncatedCell
-                                                text={listing.salesRep}
-                                              />
-                                            </TooltipProvider>
-                                          </TableCell>
-                                          <TableCell className="text-right">
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={(e) => {
-                                                e.stopPropagation()
-                                                openListingModal(listing)
-                                              }}
-                                            >
-                                              <Eye className="h-4 w-4" />
-                                              <span className="sr-only">
-                                                View details
-                                              </span>
-                                            </Button>
-                                          </TableCell>
+                                          <TableHead>
+                                            {activeTab === 'pre-auction'
+                                              ? 'Scheduled Date'
+                                              : 'End Date'}
+                                          </TableHead>
+                                          <TableHead>Location</TableHead>
+                                          <TableHead>Sales Rep</TableHead>
+                                          <TableHead className="text-right">
+                                            Actions
+                                          </TableHead>
                                         </TableRow>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
-                                </div>
-                              </AccordionContent>
-                            </AccordionItem>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {auction.listings.map((listing) => (
+                                          <TableRow
+                                            key={listing.id}
+                                            className="cursor-pointer"
+                                            onClick={() =>
+                                              openListingModal(listing)
+                                            }
+                                          >
+                                            <TableCell>
+                                              <div className="flex flex-col">
+                                                <span className="font-medium">
+                                                  <TooltipProvider>
+                                                    <TruncatedCell
+                                                      text={listing.title}
+                                                    />
+                                                  </TooltipProvider>
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                  <TooltipProvider>
+                                                    <TruncatedCell
+                                                      text={listing.seller}
+                                                    />
+                                                  </TooltipProvider>
+                                                </span>
+                                              </div>
+                                            </TableCell>
+                                            <TableCell>
+                                              <Badge variant="outline">
+                                                <TooltipProvider>
+                                                  <TruncatedCell
+                                                    text={listing.category}
+                                                  />
+                                                </TooltipProvider>
+                                              </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                              <Badge
+                                                variant={getStatusBadgeVariant(
+                                                  listing.auctionStatus,
+                                                )}
+                                              >
+                                                <TooltipProvider>
+                                                  <TruncatedCell
+                                                    text={
+                                                      listing.auctionStatus ===
+                                                      'Unassigned'
+                                                        ? 'Unassigned Auction'
+                                                        : listing.auctionStatus
+                                                    }
+                                                  />
+                                                </TooltipProvider>
+                                              </Badge>
+                                            </TableCell>
+                                            {activeTab !== 'post-auction' && (
+                                              <TableCell>
+                                                {formatCurrency(
+                                                  listing.startingBid,
+                                                )}
+                                              </TableCell>
+                                            )}
+                                            {activeTab !== 'pre-auction' && (
+                                              <TableCell className="font-semibold">
+                                                {formatCurrency(
+                                                  listing.currentBid,
+                                                )}
+                                              </TableCell>
+                                            )}
+                                            {activeTab !== 'pre-auction' && (
+                                              <TableCell className="text-center">
+                                                {listing.bids}
+                                              </TableCell>
+                                            )}
+                                            <TableCell>
+                                              {formatDate(listing.endDate)}
+                                            </TableCell>
+                                            <TableCell>
+                                              <TooltipProvider>
+                                                <TruncatedCell
+                                                  text={listing.location}
+                                                />
+                                              </TooltipProvider>
+                                            </TableCell>
+                                            <TableCell>
+                                              <TooltipProvider>
+                                                <TruncatedCell
+                                                  text={listing.salesRep}
+                                                />
+                                              </TooltipProvider>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  openListingModal(listing)
+                                                }}
+                                              >
+                                                <Eye className="h-4 w-4" />
+                                                <span className="sr-only">
+                                                  View details
+                                                </span>
+                                              </Button>
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+                              {auction.auctionName === 'Unassigned' && (
+                                <Separator className="my-4 h-[2px] bg-border" />
+                              )}
+                            </React.Fragment>
                           ))}
                         </Accordion>
                       )}
@@ -1875,7 +2408,7 @@ function Dashboard() {
 
                 {/* Auction Assignment - only for Unassigned listings */}
                 {selectedListing.auctionStatus === 'Unassigned' && (
-                  <div className="space-y-3 bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+                  <div className="space-y-3 bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border-2 border-amber-200 dark:border-amber-800">
                     <div>
                       <Label className="text-sm font-semibold text-amber-900 dark:text-amber-100">
                         Assign to Auction
@@ -1889,7 +2422,7 @@ function Dashboard() {
                       value={assignToAuction}
                       onValueChange={setAssignToAuction}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="w-full bg-white dark:bg-gray-900">
                         <SelectValue placeholder="Select an auction..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -1906,11 +2439,11 @@ function Dashboard() {
                 )}
 
                 {/* Action Suggestion */}
-                <div className="space-y-3 bg-muted/50 p-4 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <div className="bg-primary/10 p-2 rounded-full mt-0.5">
+                <div className="space-y-3 bg-gradient-to-r from-blue-50 to-blue-100/50 p-4 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-gradient-to-r from-blue-50 to-blue-100/50 border-2 border-blue-200 p-2 rounded-full mt-0.5">
                       <svg
-                        className="h-4 w-4 text-primary"
+                        className="h-4 w-4 text-blue-600"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"

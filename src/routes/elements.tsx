@@ -181,7 +181,7 @@ function App() {
                                 <div className="flex items-center gap-4 w-full">
                                   <div className="flex-1 min-w-100">
                                     <div className="flex items-center gap-4">
-                                      <Badge className="bg-blue-100 text-blue-600 uppercase font-bold">
+                                      <Badge className="bg-blue-100 text-blue-600 uppercase font-bold border-0 rounded-2xl">
                                         New
                                       </Badge>
                                       <AlertTitle className="flex-1 leading-3.5">
@@ -189,7 +189,10 @@ function App() {
                                       </AlertTitle>
                                     </div>
                                   </div>
-                                  <Button className="flex-shrink-0 h-6 text-white font-bold rounded-full flex items-center justify-center p-0 bg-blue-400 hover:bg-blue-50">
+                                  <Button
+                                    className="flex-shrink-0 h-6 text-white font-bold rounded-full flex items-center justify-center p-0 bg-blue-400 hover:bg-blue-50:text-blue-600 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 border-0 shadow-md hover:shadow-lg"
+                                    variant="info"
+                                  >
                                     Check it out
                                     <ChevronRight className="text-white w-4 h-4" />
                                   </Button>
@@ -308,7 +311,7 @@ function App() {
                             <Badge variant="outline">Outline</Badge>
                             <Badge variant="destructive">Destructive</Badge>
                             <Badge variant="information">Information</Badge>
-                            <Badge variant="successful">Successful</Badge>
+                            <Badge variant="brand">Successful</Badge>
                             <Badge variant="warning">Warning</Badge>
                             <Badge variant="neutral">Neutral</Badge>
                             <Badge variant="location">

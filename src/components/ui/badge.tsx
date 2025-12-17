@@ -6,32 +6,32 @@ import type { VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
-  'inline-flex items-center justify-center rounded-2xl border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden',
+  'inline-flex items-center justify-center rounded-lg border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden',
   {
     variants: {
       variant: {
         default:
-          'border-transparent bg-primary text-primary-foreground [a&]:hover:bg-primary/90',
+          'border-[oklab(0.768999_0.0640533_0.176752)] bg-[oklab(0.768999_0.0640533_0.176752)]/10 text-[oklab(0.668999_0.0640533_0.176752)] [a&]:hover:bg-[oklab(0.768999_0.0640533_0.176752)]/20 dark:border-[oklab(0.768999_0.0640533_0.176752)] dark:text-[oklab(0.868999_0.0640533_0.176752)]',
         secondary:
-          'border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90',
+          'border-border bg-secondary/50 text-secondary-foreground [a&]:hover:bg-secondary',
         destructive:
-          'border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60',
+          'border-destructive bg-destructive/10 text-destructive [a&]:hover:bg-destructive/20 dark:border-destructive dark:text-destructive',
         outline:
-          'text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
+          'border-border bg-background text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
         location:
           'border-transparent bg-green-600 text-background [a&]:hover:bg-blue-400/80',
         draft:
           'border-transparent bg-blue-200 text-foreground [a&]:hover:bg-blue-300/80',
         archived:
           'border-transparent bg-gray-100 text-muted-foreground [a&]:hover:bg-gray-100/80',
-        successful:
-          'border-transparent bg-[oklch(0.627_0.194_149.214)] text-white [a&]:hover:bg-[oklch(0.627_0.194_149.214)]/80 dark:bg-[oklch(0.627_0.194_149.214)] dark:text-white dark:[a&]:hover:bg-[oklch(0.627_0.194_149.214)]/80',
+        brand:
+          'border-[oklch(0.627_0.194_149.214)] bg-[oklch(0.627_0.194_149.214)]/10 text-[oklch(0.527_0.194_149.214)] [a&]:hover:bg-[oklch(0.627_0.194_149.214)]/20 dark:border-[oklch(0.627_0.194_149.214)] dark:text-[oklch(0.727_0.194_149.214)]',
         warning:
-          'border-transparent bg-[oklab(0.768999_0.0640533_0.176752)] text-black [a&]:hover:bg-[oklab(0.768999_0.0640533_0.176752)]/80 dark:bg-[oklab(0.768999_0.0640533_0.176752)] dark:text-black dark:[a&]:hover:bg-[oklab(0.768999_0.0640533_0.176752)]/80',
+          'border-[oklab(0.768999_0.0640533_0.176752)] bg-[oklab(0.768999_0.0640533_0.176752)]/10 text-[oklab(0.668999_0.0640533_0.176752)] [a&]:hover:bg-[oklab(0.768999_0.0640533_0.176752)]/20 dark:border-[oklab(0.768999_0.0640533_0.176752)] dark:text-[oklab(0.868999_0.0640533_0.176752)]',
         neutral:
-          'border-transparent bg-black text-white [a&]:hover:bg-black/80 dark:bg-black dark:text-white dark:[a&]:hover:bg-black/80',
+          'border-gray-300 bg-gray-100 text-gray-700 [a&]:hover:bg-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300',
         information:
-          'border-transparent bg-blue-600 text-white [a&]:hover:bg-blue-600/80 dark:bg-blue-600 dark:text-white dark:[a&]:hover:bg-blue-600/80',
+          'border-blue-600 bg-blue-600/10 text-blue-700 [a&]:hover:bg-blue-600/20 dark:border-blue-500 dark:text-blue-400',
       },
     },
     defaultVariants: {
