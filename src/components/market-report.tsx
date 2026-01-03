@@ -9,6 +9,7 @@ import {
   LineChart,
   Pie,
   PieChart,
+  ReferenceDot,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -200,9 +201,7 @@ const TractorPerformanceReport = () => {
   }) => (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">
-          {subValue || label}
-        </CardTitle>
+        <CardTitle className="text-sm font-medium">{label}</CardTitle>
         {trend !== undefined && (
           <Badge
             variant={trendUp ? 'default' : 'destructive'}
@@ -219,7 +218,9 @@ const TractorPerformanceReport = () => {
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground mt-1">{label}</p>
+        {subValue && (
+          <p className="text-xs text-muted-foreground mt-1">{subValue}</p>
+        )}
       </CardContent>
     </Card>
   )
@@ -228,7 +229,7 @@ const TractorPerformanceReport = () => {
     <div className="bg-sidebar p-4">
       <div className="space-y-4">
         {/* Hero Image */}
-        <div className="w-full bg-black flex justify-start">
+        <div className="w-full bg-black flex items-center justify-start">
           <img
             src={`${import.meta.env.BASE_URL}email-header.jpg`}
             alt="BigIron Auctions Market Report"
@@ -266,16 +267,16 @@ const TractorPerformanceReport = () => {
             className="w-full max-w-2xl"
           >
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger className="cursor-pointer" value="30">
+              <TabsTrigger value="30" className="cursor-pointer">
                 Last 30 Days
               </TabsTrigger>
-              <TabsTrigger className="cursor-pointer" value="60">
+              <TabsTrigger value="60" className="cursor-pointer">
                 Last 60 Days
               </TabsTrigger>
-              <TabsTrigger className="cursor-pointer" value="90">
+              <TabsTrigger value="90" className="cursor-pointer">
                 Last 90 Days
               </TabsTrigger>
-              <TabsTrigger className="cursor-pointer" value="365">
+              <TabsTrigger value="365" className="cursor-pointer">
                 Last 365 Days
               </TabsTrigger>
             </TabsList>
@@ -285,26 +286,26 @@ const TractorPerformanceReport = () => {
         {/* Key Metrics */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard
-            subValue="Average Sale Price"
+            label="Average Sale Price"
             value={`$${currentData.avgPrice.toLocaleString()}`}
-            label={`Range: $${currentData.lowestPrice.toLocaleString()} - $${currentData.highestPrice.toLocaleString()}`}
+            subValue={`Range: $${currentData.lowestPrice.toLocaleString()} - $${currentData.highestPrice.toLocaleString()}`}
             trend={currentData.priceChange}
             trendUp={currentData.priceChange > 0}
           />
           <StatCard
-            subValue="Total Auctions"
+            label="Total Auctions"
             value={currentData.totalAuctions}
-            label={`${currentData.sold} sold (${currentData.sellThroughRate}% sell-through)`}
+            subValue={`${currentData.sold} sold (${currentData.sellThroughRate}% sell-through)`}
           />
           <StatCard
-            subValue="Average Bids per Auction"
+            label="Average Bids per Auction"
             value={currentData.avgBids.toFixed(1)}
-            label="Active bidding competition"
+            subValue="Active bidding competition"
           />
           <StatCard
-            subValue="Sell-Through Rate"
+            label="Sell-Through Rate"
             value={`${currentData.sellThroughRate}%`}
-            label={`${currentData.sold} of ${currentData.totalAuctions} auctions`}
+            subValue={`${currentData.sold} of ${currentData.totalAuctions} auctions`}
           />
         </div>
 
@@ -328,6 +329,10 @@ const TractorPerformanceReport = () => {
                 <YAxis
                   className="text-xs"
                   tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  domain={[
+                    (dataMin: number) => Math.floor(dataMin * 0.95),
+                    (dataMax: number) => Math.ceil(dataMax * 1.1),
+                  ]}
                 />
                 <Tooltip
                   contentStyle={{
@@ -346,6 +351,46 @@ const TractorPerformanceReport = () => {
                   name="Average Price"
                   dot={{ fill: '#3b82f6', r: 4 }}
                   connectNulls
+                />
+                {/* Highest Point Marker */}
+                <ReferenceDot
+                  x={
+                    currentData.trendData.reduce((max, point) =>
+                      point.avgPrice > max.avgPrice ? point : max,
+                    ).date
+                  }
+                  y={Math.max(...currentData.trendData.map((d) => d.avgPrice))}
+                  r={6}
+                  fill="#10b981"
+                  stroke="#fff"
+                  strokeWidth={2}
+                  label={{
+                    value: `High: $${Math.max(...currentData.trendData.map((d) => d.avgPrice)).toLocaleString()}`,
+                    position: 'top',
+                    fill: '#10b981',
+                    fontSize: 12,
+                    fontWeight: 'bold',
+                  }}
+                />
+                {/* Lowest Point Marker */}
+                <ReferenceDot
+                  x={
+                    currentData.trendData.reduce((min, point) =>
+                      point.avgPrice < min.avgPrice ? point : min,
+                    ).date
+                  }
+                  y={Math.min(...currentData.trendData.map((d) => d.avgPrice))}
+                  r={6}
+                  fill="#ef4444"
+                  stroke="#fff"
+                  strokeWidth={2}
+                  label={{
+                    value: `Low: $${Math.min(...currentData.trendData.map((d) => d.avgPrice)).toLocaleString()}`,
+                    position: 'bottom',
+                    fill: '#ef4444',
+                    fontSize: 12,
+                    fontWeight: 'bold',
+                  }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -462,13 +507,13 @@ const TractorPerformanceReport = () => {
         </div>
 
         {/* Market Insights */}
-        <Card className="border-primary/50 bg-primary/20">
+        <Card className="border-primary/70 bg-primary/30">
           <CardHeader>
             <CardTitle>Market Insights & Recommendations</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-3">
-              <div className="space-y-2 rounded-lg border border-primary/50 bg-background/50 p-4">
+              <div className="space-y-2 rounded-lg border-primary/70 border bg-background/50 p-4">
                 <h3 className="font-semibold">🎯 Optimal Timing</h3>
                 <p className="text-sm text-muted-foreground">
                   Prices have been{' '}
@@ -478,7 +523,7 @@ const TractorPerformanceReport = () => {
                   strong market demand.
                 </p>
               </div>
-              <div className="space-y-2 rounded-lg border border-primary/50 bg-background/50 p-4">
+              <div className="space-y-2 rounded-lg border-primary/70 border bg-background/50 p-4">
                 <h3 className="font-semibold">💰 Price Positioning</h3>
                 <p className="text-sm text-muted-foreground">
                   Similar equipment averaged $
@@ -487,7 +532,7 @@ const TractorPerformanceReport = () => {
                   healthy buyer competition.
                 </p>
               </div>
-              <div className="space-y-2 rounded-lg border border-primary/50 bg-background/50 p-4">
+              <div className="space-y-2 rounded-lg border-primary/70 border bg-background/50 p-4">
                 <h3 className="font-semibold">📊 Market Strength</h3>
                 <p className="text-sm text-muted-foreground">
                   {currentData.sold} of {currentData.totalAuctions} similar
