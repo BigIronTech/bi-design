@@ -16,6 +16,7 @@ import { Route as StandardsRouteImport } from './routes/standards'
 import { Route as PersonasRouteImport } from './routes/personas'
 import { Route as PatternsRouteImport } from './routes/patterns'
 import { Route as MarketReportsRouteImport } from './routes/market-reports'
+import { Route as IpBanManagementRouteImport } from './routes/ip-ban-management'
 import { Route as ImageryRouteImport } from './routes/imagery'
 import { Route as IdentityRouteImport } from './routes/identity'
 import { Route as FormsRouteImport } from './routes/forms'
@@ -58,6 +59,11 @@ const PatternsRoute = PatternsRouteImport.update({
 const MarketReportsRoute = MarketReportsRouteImport.update({
   id: '/market-reports',
   path: '/market-reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IpBanManagementRoute = IpBanManagementRouteImport.update({
+  id: '/ip-ban-management',
+  path: '/ip-ban-management',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ImageryRoute = ImageryRouteImport.update({
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/forms': typeof FormsRoute
   '/identity': typeof IdentityRoute
   '/imagery': typeof ImageryRoute
+  '/ip-ban-management': typeof IpBanManagementRoute
   '/market-reports': typeof MarketReportsRoute
   '/patterns': typeof PatternsRoute
   '/personas': typeof PersonasRoute
@@ -127,6 +134,7 @@ export interface FileRoutesByTo {
   '/forms': typeof FormsRoute
   '/identity': typeof IdentityRoute
   '/imagery': typeof ImageryRoute
+  '/ip-ban-management': typeof IpBanManagementRoute
   '/market-reports': typeof MarketReportsRoute
   '/patterns': typeof PatternsRoute
   '/personas': typeof PersonasRoute
@@ -145,6 +153,7 @@ export interface FileRoutesById {
   '/forms': typeof FormsRoute
   '/identity': typeof IdentityRoute
   '/imagery': typeof ImageryRoute
+  '/ip-ban-management': typeof IpBanManagementRoute
   '/market-reports': typeof MarketReportsRoute
   '/patterns': typeof PatternsRoute
   '/personas': typeof PersonasRoute
@@ -164,6 +173,7 @@ export interface FileRouteTypes {
     | '/forms'
     | '/identity'
     | '/imagery'
+    | '/ip-ban-management'
     | '/market-reports'
     | '/patterns'
     | '/personas'
@@ -181,6 +191,7 @@ export interface FileRouteTypes {
     | '/forms'
     | '/identity'
     | '/imagery'
+    | '/ip-ban-management'
     | '/market-reports'
     | '/patterns'
     | '/personas'
@@ -198,6 +209,7 @@ export interface FileRouteTypes {
     | '/forms'
     | '/identity'
     | '/imagery'
+    | '/ip-ban-management'
     | '/market-reports'
     | '/patterns'
     | '/personas'
@@ -216,6 +228,7 @@ export interface RootRouteChildren {
   FormsRoute: typeof FormsRoute
   IdentityRoute: typeof IdentityRoute
   ImageryRoute: typeof ImageryRoute
+  IpBanManagementRoute: typeof IpBanManagementRoute
   MarketReportsRoute: typeof MarketReportsRoute
   PatternsRoute: typeof PatternsRoute
   PersonasRoute: typeof PersonasRoute
@@ -274,6 +287,13 @@ declare module '@tanstack/react-router' {
       path: '/market-reports'
       fullPath: '/market-reports'
       preLoaderRoute: typeof MarketReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ip-ban-management': {
+      id: '/ip-ban-management'
+      path: '/ip-ban-management'
+      fullPath: '/ip-ban-management'
+      preLoaderRoute: typeof IpBanManagementRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/imagery': {
@@ -344,6 +364,7 @@ const rootRouteChildren: RootRouteChildren = {
   FormsRoute: FormsRoute,
   IdentityRoute: IdentityRoute,
   ImageryRoute: ImageryRoute,
+  IpBanManagementRoute: IpBanManagementRoute,
   MarketReportsRoute: MarketReportsRoute,
   PatternsRoute: PatternsRoute,
   PersonasRoute: PersonasRoute,
