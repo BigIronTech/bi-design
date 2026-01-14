@@ -258,9 +258,10 @@ function DashboardWrapper({ children }: { children: React.ReactNode }) {
 function IPBanManagement() {
   const [bans, setBans] = useState<Array<IPBan>>(ipBans)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<
-    'all' | 'active' | 'expired' | 'unbanned'
-  >('all')
+  const [statusFilter, setStatusFilter] = useState<'active' | 'unbanned'>(
+    'active',
+  )
+  const [bannedByFilter, setBannedByFilter] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedBan, setSelectedBan] = useState<IPBan | null>(null)
   const [showAuditLog, setShowAuditLog] = useState(false)
@@ -274,6 +275,7 @@ function IPBanManagement() {
     duration: '' as BanDuration | '',
     customNotes: '',
     lotNumber: '',
+    bidderIdName: '', // Combined field for duplicate accounts
     bidderId: '',
     bidderName: '',
     duplicateOfBidderId: '',
@@ -303,9 +305,19 @@ function IPBanManagement() {
       ban.lotNumber?.includes(searchTerm) ||
       ban.bannedBy.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       ban.bannedBy.email.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || ban.status === statusFilter
 
-    return matchesSearch && matchesStatus
+    // Status filter: "unbanned" tab shows both expired and unbanned
+    const matchesStatus =
+      statusFilter === 'active'
+        ? ban.status === 'active'
+        : ban.status === 'expired' || ban.status === 'unbanned'
+
+    // Banned by filter
+    const matchesBannedBy = bannedByFilter
+      ? ban.bannedBy.id === bannedByFilter
+      : true
+
+    return matchesSearch && matchesStatus && matchesBannedBy
   })
 
   const sortedBans = [...filteredBans].sort((a, b) => {
@@ -360,11 +372,8 @@ function IPBanManagement() {
       return
     }
 
-    if (
-      selectedReason?.requiresBidder &&
-      (!newBan.bidderId || !newBan.bidderName)
-    ) {
-      alert('Bidder information is required for this ban reason')
+    if (selectedReason?.requiresBidder && !newBan.bidderIdName) {
+      alert('Bidder ID/Name is required for this ban reason')
       return
     }
 
@@ -414,7 +423,7 @@ function IPBanManagement() {
       bannedBy: currentUser,
       lotNumber: newBan.lotNumber || undefined,
       bidderId: newBan.bidderId || undefined,
-      bidderName: newBan.bidderName || undefined,
+      bidderName: newBan.bidderName || newBan.bidderIdName || undefined,
       duplicateOfBidderId: newBan.duplicateOfBidderId || undefined,
       auditLog: [
         {
@@ -435,6 +444,7 @@ function IPBanManagement() {
       duration: '',
       customNotes: '',
       lotNumber: '',
+      bidderIdName: '',
       bidderId: '',
       bidderName: '',
       duplicateOfBidderId: '',
@@ -485,6 +495,16 @@ function IPBanManagement() {
     (r: (typeof banReasons)[number]) => r.value === newBan.banReason,
   )
 
+  const handleUserBansClick = () => {
+    if (bannedByFilter === currentUser.id) {
+      // Clear filter if already filtering by current user
+      setBannedByFilter(null)
+    } else {
+      // Set filter to current user
+      setBannedByFilter(currentUser.id)
+    }
+  }
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -522,11 +542,19 @@ function IPBanManagement() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card
+              className={cn(
+                'cursor-pointer transition-colors',
+                bannedByFilter === currentUser.id
+                  ? 'ring-2 ring-brand'
+                  : 'hover:bg-muted/50',
+              )}
+              onClick={handleUserBansClick}
+            >
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  Your Bans
+                  {currentUser.name.split(' ')[0]}'s Bans
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -557,20 +585,67 @@ function IPBanManagement() {
                 onValueChange={(value) => setStatusFilter(value as any)}
               >
                 <div className="flex flex-col gap-4 mb-6">
+                  {/* Search - Now above tabs */}
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search by IP, bidder name, lot number, or banned by..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-9 bg-background"
+                      />
+                    </div>
+                    {/* Filter badges */}
+                    {(searchTerm || bannedByFilter) && (
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {searchTerm && (
+                            <Badge
+                              variant="secondary"
+                              className="gap-2 pl-3 pr-2"
+                            >
+                              <span>Search: {searchTerm}</span>
+                              <button
+                                onClick={() => setSearchTerm('')}
+                                className="hover:bg-muted-foreground/20 rounded-full p-0.5"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          )}
+                          {bannedByFilter && (
+                            <Badge
+                              variant="secondary"
+                              className="gap-2 pl-3 pr-2"
+                            >
+                              <span>Banned by: {currentUser.name}</span>
+                              <button
+                                onClick={() => setBannedByFilter(null)}
+                                className="hover:bg-muted-foreground/20 rounded-full p-0.5"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSearchTerm('')
+                            setBannedByFilter(null)
+                          }}
+                          className="h-7 px-2 text-xs"
+                        >
+                          Clear all
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Tabs */}
                   <TabsList className="rounded-[12px] w-fit">
-                    <TabsTrigger
-                      value="all"
-                      className="gap-2 cursor-pointer rounded-[10px]"
-                    >
-                      All
-                      <Badge
-                        variant="secondary"
-                        className="ml-1 rounded-full bg-muted text-muted-foreground font-semibold"
-                      >
-                        {bans.length}
-                      </Badge>
-                    </TabsTrigger>
                     <TabsTrigger
                       value="active"
                       className="gap-2 cursor-pointer rounded-[10px]"
@@ -584,18 +659,6 @@ function IPBanManagement() {
                       </Badge>
                     </TabsTrigger>
                     <TabsTrigger
-                      value="expired"
-                      className="gap-2 cursor-pointer rounded-[10px]"
-                    >
-                      Expired
-                      <Badge
-                        variant="secondary"
-                        className="ml-1 rounded-full bg-muted text-muted-foreground font-semibold"
-                      >
-                        {bans.filter((b) => b.status === 'expired').length}
-                      </Badge>
-                    </TabsTrigger>
-                    <TabsTrigger
                       value="unbanned"
                       className="gap-2 cursor-pointer rounded-[10px]"
                     >
@@ -604,21 +667,15 @@ function IPBanManagement() {
                         variant="secondary"
                         className="ml-1 rounded-full bg-muted text-muted-foreground font-semibold"
                       >
-                        {bans.filter((b) => b.status === 'unbanned').length}
+                        {
+                          bans.filter(
+                            (b) =>
+                              b.status === 'expired' || b.status === 'unbanned',
+                          ).length
+                        }
                       </Badge>
                     </TabsTrigger>
                   </TabsList>
-
-                  {/* Search */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search by IP, bidder name, lot number, or banned by..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-9 bg-background"
-                    />
-                  </div>
                 </div>
 
                 <TabsContent value={statusFilter} className="mt-0">
@@ -805,6 +862,7 @@ function IPBanManagement() {
                                   <Button
                                     variant="secondary"
                                     size="sm"
+                                    className="hidden"
                                     onClick={() => {
                                       setSelectedBan(ban)
                                       setShowAuditLog(true)
@@ -875,6 +933,7 @@ function IPBanManagement() {
                     ...newBan,
                     banReason: value,
                     lotNumber: '',
+                    bidderIdName: '',
                     bidderId: '',
                     bidderName: '',
                     duplicateOfBidderId: '',
@@ -942,69 +1001,89 @@ function IPBanManagement() {
               </div>
             )}
 
-            {/* Conditional: Bidder Info */}
-            {selectedReasonConfig?.requiresBidder && (
-              <div className="space-y-3 bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg border">
+            {/* Conditional: Bidder Info - Combined for Duplicate Accounts */}
+            {selectedReasonConfig?.requiresDuplicateAccount && (
+              <div className="space-y-3 bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
                 <div className="space-y-2">
-                  <Label htmlFor="bidder-id">
-                    Bidder ID <span className="text-destructive">*</span>
+                  <Label htmlFor="bidder-id-name">
+                    Bidder ID/Name <span className="text-destructive">*</span>
                   </Label>
                   <Input
-                    id="bidder-id"
-                    value={newBan.bidderId}
+                    id="bidder-id-name"
+                    value={newBan.bidderIdName}
                     onChange={(e) =>
-                      setNewBan({ ...newBan, bidderId: e.target.value })
+                      setNewBan({ ...newBan, bidderIdName: e.target.value })
+                    }
+                    placeholder="123456 or John Smith"
+                    className="bg-white"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter either the Bidder ID (6 digits) or Bidder Name
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="duplicate-bidder-id">
+                    Duplicate of Bidder ID{' '}
+                    <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="duplicate-bidder-id"
+                    value={newBan.duplicateOfBidderId}
+                    onChange={(e) =>
+                      setNewBan({
+                        ...newBan,
+                        duplicateOfBidderId: e.target.value,
+                      })
                     }
                     placeholder="123456"
                     maxLength={6}
                     className="font-mono bg-white"
                   />
                   <p className="text-xs text-muted-foreground">
-                    6 digits starting with 1
+                    Which bidder account is being duplicated
                   </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="bidder-name">
-                    Bidder Name <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="bidder-name"
-                    value={newBan.bidderName}
-                    onChange={(e) =>
-                      setNewBan({ ...newBan, bidderName: e.target.value })
-                    }
-                    placeholder="John Smith"
-                    className="bg-white"
-                  />
                 </div>
               </div>
             )}
 
-            {/* Conditional: Duplicate Account */}
-            {selectedReasonConfig?.requiresDuplicateAccount && (
-              <div className="space-y-2 bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
-                <Label htmlFor="duplicate-bidder-id">
-                  Duplicate of Bidder ID{' '}
-                  <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="duplicate-bidder-id"
-                  value={newBan.duplicateOfBidderId}
-                  onChange={(e) =>
-                    setNewBan({
-                      ...newBan,
-                      duplicateOfBidderId: e.target.value,
-                    })
-                  }
-                  placeholder="123456"
-                  maxLength={6}
-                  className="font-mono bg-white"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Which bidder account is being duplicated
-                </p>
-              </div>
-            )}
+            {/* Conditional: Bidder Info - Original for other reasons */}
+            {selectedReasonConfig?.requiresBidder &&
+              !selectedReasonConfig.requiresDuplicateAccount && (
+                <div className="space-y-3 bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg border">
+                  <div className="space-y-2">
+                    <Label htmlFor="bidder-id">
+                      Bidder ID <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="bidder-id"
+                      value={newBan.bidderId}
+                      onChange={(e) =>
+                        setNewBan({ ...newBan, bidderId: e.target.value })
+                      }
+                      placeholder="123456"
+                      maxLength={6}
+                      className="font-mono bg-white"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      6 digits starting with 1
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bidder-name">
+                      Bidder Name <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="bidder-name"
+                      value={newBan.bidderName}
+                      onChange={(e) =>
+                        setNewBan({ ...newBan, bidderName: e.target.value })
+                      }
+                      placeholder="John Smith"
+                      className="bg-white"
+                    />
+                  </div>
+                </div>
+              )}
 
             {/* Notes */}
             <div className="space-y-2">
@@ -1033,6 +1112,7 @@ function IPBanManagement() {
                   duration: '',
                   customNotes: '',
                   lotNumber: '',
+                  bidderIdName: '',
                   bidderId: '',
                   bidderName: '',
                   duplicateOfBidderId: '',
