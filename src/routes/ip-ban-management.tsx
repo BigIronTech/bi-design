@@ -584,7 +584,7 @@ function IPBanManagement() {
                 value={statusFilter}
                 onValueChange={(value) => setStatusFilter(value as any)}
               >
-                <div className="flex flex-col gap-4 mb-6">
+                <div className="flex flex-col gap-4">
                   {/* Search - Now above tabs */}
                   <div className="space-y-2">
                     <div className="relative">
