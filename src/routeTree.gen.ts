@@ -20,6 +20,7 @@ import { Route as IpBanManagementRouteImport } from './routes/ip-ban-management'
 import { Route as ImageryRouteImport } from './routes/imagery'
 import { Route as IdentityRouteImport } from './routes/identity'
 import { Route as FormsRouteImport } from './routes/forms'
+import { Route as FindARepRouteImport } from './routes/find-a-rep'
 import { Route as FigmaRouteImport } from './routes/figma'
 import { Route as ElementsRouteImport } from './routes/elements'
 import { Route as DashboardsOldRouteImport } from './routes/dashboards-old'
@@ -81,6 +82,11 @@ const FormsRoute = FormsRouteImport.update({
   path: '/forms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FindARepRoute = FindARepRouteImport.update({
+  id: '/find-a-rep',
+  path: '/find-a-rep',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FigmaRoute = FigmaRouteImport.update({
   id: '/figma',
   path: '/figma',
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/dashboards-old': typeof DashboardsOldRoute
   '/elements': typeof ElementsRoute
   '/figma': typeof FigmaRoute
+  '/find-a-rep': typeof FindARepRoute
   '/forms': typeof FormsRoute
   '/identity': typeof IdentityRoute
   '/imagery': typeof ImageryRoute
@@ -131,6 +138,7 @@ export interface FileRoutesByTo {
   '/dashboards-old': typeof DashboardsOldRoute
   '/elements': typeof ElementsRoute
   '/figma': typeof FigmaRoute
+  '/find-a-rep': typeof FindARepRoute
   '/forms': typeof FormsRoute
   '/identity': typeof IdentityRoute
   '/imagery': typeof ImageryRoute
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   '/dashboards-old': typeof DashboardsOldRoute
   '/elements': typeof ElementsRoute
   '/figma': typeof FigmaRoute
+  '/find-a-rep': typeof FindARepRoute
   '/forms': typeof FormsRoute
   '/identity': typeof IdentityRoute
   '/imagery': typeof ImageryRoute
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
     | '/dashboards-old'
     | '/elements'
     | '/figma'
+    | '/find-a-rep'
     | '/forms'
     | '/identity'
     | '/imagery'
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
     | '/dashboards-old'
     | '/elements'
     | '/figma'
+    | '/find-a-rep'
     | '/forms'
     | '/identity'
     | '/imagery'
@@ -206,6 +217,7 @@ export interface FileRouteTypes {
     | '/dashboards-old'
     | '/elements'
     | '/figma'
+    | '/find-a-rep'
     | '/forms'
     | '/identity'
     | '/imagery'
@@ -225,6 +237,7 @@ export interface RootRouteChildren {
   DashboardsOldRoute: typeof DashboardsOldRoute
   ElementsRoute: typeof ElementsRoute
   FigmaRoute: typeof FigmaRoute
+  FindARepRoute: typeof FindARepRoute
   FormsRoute: typeof FormsRoute
   IdentityRoute: typeof IdentityRoute
   ImageryRoute: typeof ImageryRoute
@@ -317,6 +330,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FormsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/find-a-rep': {
+      id: '/find-a-rep'
+      path: '/find-a-rep'
+      fullPath: '/find-a-rep'
+      preLoaderRoute: typeof FindARepRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/figma': {
       id: '/figma'
       path: '/figma'
@@ -361,6 +381,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardsOldRoute: DashboardsOldRoute,
   ElementsRoute: ElementsRoute,
   FigmaRoute: FigmaRoute,
+  FindARepRoute: FindARepRoute,
   FormsRoute: FormsRoute,
   IdentityRoute: IdentityRoute,
   ImageryRoute: ImageryRoute,
