@@ -1,12 +1,10 @@
 import { useMemo, useState } from 'react'
+import { CountyCombobox } from '@/components/CountyCombobox'
 
 // ─── Image helper ─────────────────────────────────────────────────────────────
 const img = (filename: string) => `${import.meta.env.BASE_URL}${filename}`
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
-// Uses Vite BASE_URL so paths work in dev, build, and on the server.
-// Males:   sales1–sales5, sales8–sales11
-// Females: sales6–sales7  (reused across female reps)
 const REPRESENTATIVES = [
   {
     id: 1,
@@ -178,59 +176,6 @@ const REPRESENTATIVES = [
   },
 ]
 
-const US_STATES = [
-  { code: 'AL', name: 'Alabama' },
-  { code: 'AK', name: 'Alaska' },
-  { code: 'AZ', name: 'Arizona' },
-  { code: 'AR', name: 'Arkansas' },
-  { code: 'CA', name: 'California' },
-  { code: 'CO', name: 'Colorado' },
-  { code: 'CT', name: 'Connecticut' },
-  { code: 'DE', name: 'Delaware' },
-  { code: 'FL', name: 'Florida' },
-  { code: 'GA', name: 'Georgia' },
-  { code: 'HI', name: 'Hawaii' },
-  { code: 'ID', name: 'Idaho' },
-  { code: 'IL', name: 'Illinois' },
-  { code: 'IN', name: 'Indiana' },
-  { code: 'IA', name: 'Iowa' },
-  { code: 'KS', name: 'Kansas' },
-  { code: 'KY', name: 'Kentucky' },
-  { code: 'LA', name: 'Louisiana' },
-  { code: 'ME', name: 'Maine' },
-  { code: 'MD', name: 'Maryland' },
-  { code: 'MA', name: 'Massachusetts' },
-  { code: 'MI', name: 'Michigan' },
-  { code: 'MN', name: 'Minnesota' },
-  { code: 'MS', name: 'Mississippi' },
-  { code: 'MO', name: 'Missouri' },
-  { code: 'MT', name: 'Montana' },
-  { code: 'NE', name: 'Nebraska' },
-  { code: 'NV', name: 'Nevada' },
-  { code: 'NH', name: 'New Hampshire' },
-  { code: 'NJ', name: 'New Jersey' },
-  { code: 'NM', name: 'New Mexico' },
-  { code: 'NY', name: 'New York' },
-  { code: 'NC', name: 'North Carolina' },
-  { code: 'ND', name: 'North Dakota' },
-  { code: 'OH', name: 'Ohio' },
-  { code: 'OK', name: 'Oklahoma' },
-  { code: 'OR', name: 'Oregon' },
-  { code: 'PA', name: 'Pennsylvania' },
-  { code: 'RI', name: 'Rhode Island' },
-  { code: 'SC', name: 'South Carolina' },
-  { code: 'SD', name: 'South Dakota' },
-  { code: 'TN', name: 'Tennessee' },
-  { code: 'TX', name: 'Texas' },
-  { code: 'UT', name: 'Utah' },
-  { code: 'VT', name: 'Vermont' },
-  { code: 'VA', name: 'Virginia' },
-  { code: 'WA', name: 'Washington' },
-  { code: 'WV', name: 'West Virginia' },
-  { code: 'WI', name: 'Wisconsin' },
-  { code: 'WY', name: 'Wyoming' },
-]
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 type RepType = 'Equipment' | 'Real Estate' | 'Livestock'
 type FilterType = 'All' | RepType
@@ -302,7 +247,7 @@ function RepPhoto({
   const c = TYPE_CONFIG[type]
   return (
     <div
-      className={`w-11 h-11 rounded-full flex-shrink-0 ring-2 ${c.ring} ring-offset-2 overflow-hidden bg-muted`}
+      className={`w-16 h-16 rounded-full flex-shrink-0 ring-2 ${c.ring} ring-offset-2 overflow-hidden bg-muted`}
     >
       <img
         src={src}
@@ -332,7 +277,7 @@ function SkeletonCard({ type }: { type: RepType }) {
   return (
     <div className={`rounded-lg border ${c.border} ${c.bg} p-4 flex gap-4`}>
       <div
-        className={`w-11 h-11 rounded-full flex-shrink-0 bg-muted animate-pulse ring-2 ${c.ring} ring-offset-2`}
+        className={`w-16 h-16 rounded-full flex-shrink-0 bg-muted animate-pulse ring-2 ${c.ring} ring-offset-2`}
       />
       <div className="flex-1 min-w-0 space-y-2">
         <div className="flex items-start justify-between gap-2 flex-wrap">
@@ -341,7 +286,7 @@ function SkeletonCard({ type }: { type: RepType }) {
             <div className="h-3 w-24 bg-muted rounded animate-pulse" />
           </div>
           <span
-            className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full border ${c.badge} opacity-60 whitespace-nowrap`}
+            className={`inline-flex items-center gap-1.5 text-lg font-medium px-2 py-0.5 rounded-full border ${c.badge} opacity-60 whitespace-nowrap`}
           >
             <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
             {type}
@@ -371,10 +316,10 @@ function RepCard({ rep }: { rep: Rep }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2 flex-wrap">
           <div>
-            <p className="font-semibold text-foreground text-sm leading-tight">
+            <p className="font-semibold text-foreground text-lg leading-tight">
               {rep.name}
             </p>
-            <p className="text-xs text-muted-foreground mt-0.5">{rep.title}</p>
+            <p className="text-lg text-muted-foreground mt-0.5">{rep.title}</p>
           </div>
           <span
             className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full border ${c.badge} whitespace-nowrap`}
@@ -383,19 +328,19 @@ function RepCard({ rep }: { rep: Rep }) {
             {rep.type}
           </span>
         </div>
-        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+        <p className="text-md text-muted-foreground mt-2 leading-relaxed">
           {rep.bio}
         </p>
         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5">
           <a
             href={`tel:${rep.phone}`}
-            className={`cursor-pointer inline-flex items-center gap-1.5 text-xs font-medium ${c.accent} hover:underline`}
+            className={`cursor-pointer inline-flex items-center gap-1.5 text-lg font-medium ${c.accent} hover:underline`}
           >
             <svg
-              className="w-3 h-3 flex-shrink-0"
-              fill="none"
+              className="w-6 h-6 flex-shrink-0"
+              fill="currentColor"
               stroke="currentColor"
-              strokeWidth={2}
+              strokeWidth={0}
               viewBox="0 0 24 24"
             >
               <path
@@ -408,10 +353,10 @@ function RepCard({ rep }: { rep: Rep }) {
           </a>
           <a
             href={`mailto:${rep.email}`}
-            className={`cursor-pointer inline-flex items-center gap-1.5 text-xs font-medium ${c.accent} hover:underline`}
+            className={`cursor-pointer inline-flex items-center gap-1.5 text-lg font-medium ${c.accent} hover:underline`}
           >
             <svg
-              className="w-3 h-3 flex-shrink-0"
+              className="w-6 h-6 flex-shrink-0"
               fill="none"
               stroke="currentColor"
               strokeWidth={2}
@@ -433,21 +378,25 @@ function RepCard({ rep }: { rep: Rep }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function FindMySalesRep() {
-  const [selectedState, setSelectedState] = useState('')
   const [county, setCounty] = useState('')
   const [searched, setSearched] = useState(false)
   const [loading, setLoading] = useState(false)
   const [activeFilter, setActiveFilter] = useState<FilterType>('All')
 
+  // "County, ST" → county name + state code
+  const countyName = county.split(',')[0]?.trim() ?? ''
+  const stateCode = county.split(',')[1]?.trim().toUpperCase() ?? ''
+
   const results = useMemo<Array<Rep>>(() => {
-    if (!searched || !selectedState || !county.trim()) return []
-    const ct = county.trim().toLowerCase()
+    if (!searched || !county.trim()) return []
+    const ct = countyName.toLowerCase()
+    const sc = stateCode
     return REPRESENTATIVES.filter((rep) => {
-      if (!rep.states.includes(selectedState)) return false
+      if (sc && !rep.states.includes(sc)) return false
       if (rep.counties.includes('ALL')) return true
       return rep.counties.some((c) => c.toLowerCase() === ct)
     })
-  }, [searched, selectedState, county])
+  }, [searched, county, countyName, stateCode])
 
   const filteredResults = useMemo(
     () =>
@@ -467,8 +416,7 @@ export default function FindMySalesRep() {
     [results],
   )
 
-  const hasSearched = searched && !!selectedState && !!county.trim()
-  const stateName = US_STATES.find((s) => s.code === selectedState)?.name
+  const hasSearched = searched && !!county.trim()
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -482,7 +430,6 @@ export default function FindMySalesRep() {
   }
 
   function handleReset() {
-    setSelectedState('')
     setCounty('')
     setSearched(false)
     setLoading(false)
@@ -497,69 +444,38 @@ export default function FindMySalesRep() {
   ]
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-3xl">
+    <div className="flex flex-col gap-6 p-6 max-w-2xl">
       {/* Page Header */}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
           Find My Sales Rep
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Select your state and county to find the BigIron sales rep for
-          Equipment, Real Estate, or Livestock in your area.
+        <p className="text-lg text-muted-foreground mt-1">
+          Search by county to find your BigIron sales rep in your area.
         </p>
       </div>
 
       {/* Search Form */}
       <form onSubmit={handleSearch}>
         <div className="rounded-lg border border-border bg-card p-5 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* State */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">
-                State <span className="text-destructive">*</span>
-              </label>
-              <select
-                value={selectedState}
-                onChange={(e) => {
-                  setSelectedState(e.target.value)
-                  setSearched(false)
-                  setLoading(false)
-                }}
-                required
-                className="cursor-pointer flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 text-foreground"
-              >
-                <option value="">Select a state…</option>
-                {US_STATES.map((s) => (
-                  <option key={s.code} value={s.code}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* County — required */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">
-                County <span className="text-destructive">*</span>
-              </label>
-              <input
-                type="text"
-                value={county}
-                onChange={(e) => {
-                  setCounty(e.target.value)
-                  setSearched(false)
-                }}
-                placeholder="e.g. Lancaster"
-                required
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              />
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-foreground">
+              County <span className="text-destructive">*</span>
+            </label>
+            <CountyCombobox
+              value={county}
+              onChange={(val) => {
+                setCounty(val)
+                setSearched(false)
+              }}
+              placeholder="Search county…"
+            />
           </div>
 
           <div className="flex gap-2">
             <button
               type="submit"
-              disabled={!selectedState || !county.trim() || loading}
+              disabled={!county.trim() || loading}
               className="cursor-pointer inline-flex items-center gap-2 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium shadow hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               {loading ? (
@@ -618,9 +534,7 @@ export default function FindMySalesRep() {
                 ? `${results.length} Sales Rep${results.length !== 1 ? 's' : ''} Found`
                 : 'No Sales Reps Found'}
             </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {stateName} — {county.trim()} County
-            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">{county}</p>
           </div>
 
           {results.length > 0 ? (
@@ -672,8 +586,8 @@ export default function FindMySalesRep() {
                 No sales reps found
               </p>
               <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                We don't have a rep assigned to {county.trim()} County,{' '}
-                {stateName} yet. Please contact BigIron directly.
+                We don't have a rep assigned to {county} yet. Please contact
+                BigIron directly.
               </p>
             </div>
           )}
