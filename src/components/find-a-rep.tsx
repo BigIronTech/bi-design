@@ -286,7 +286,7 @@ function SkeletonCard({ type }: { type: RepType }) {
             <div className="h-3 w-24 bg-muted rounded animate-pulse" />
           </div>
           <span
-            className={`inline-flex items-center gap-1.5 text-lg font-medium px-2 py-0.5 rounded-full border ${c.badge} opacity-60 whitespace-nowrap`}
+            className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full border ${c.badge} opacity-60 whitespace-nowrap`}
           >
             <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
             {type}

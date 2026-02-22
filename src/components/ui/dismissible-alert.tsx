@@ -25,8 +25,8 @@ export default function DismissibleAlert() {
       <div className="w-full">
         <Alert className="relative flex">
           <div className="flex items-center gap-4">
-            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-r from-blue-50 to-blue-100/50 border-2 border-blue-200 flex items-center justify-center">
-              <Info className="h-5 w-5 text-blue-600" />
+            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-r from-sky-50 to-sky-100/50 border-2 border-sky-200 flex items-center justify-center">
+              <Info className="h-5 w-5 text-sky-600" />
             </div>
             <div className="flex-1 min-w-0">
               <AlertTitle className="mb-1">Dismissible Info Alert</AlertTitle>

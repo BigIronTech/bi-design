@@ -10,13 +10,13 @@ const alertVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-gradient-to-r from-blue-50 to-blue-100/50 border-2 border-blue-200 text-lg text-slate-900 font-normal p-6 shadow-lg [&>svg]:text-blue-700 *:data-[slot=alert-description]:text-slate-700',
+          'bg-gradient-to-r from-sky-50 to-sky-100/50 border-2 border-sky-200 text-lg text-slate-900 font-normal p-6 shadow-lg [&>svg]:text-sky-700 *:data-[slot=alert-description]:text-slate-700',
         success:
-          'bg-gradient-to-r from-green-50 to-green-100/50 border-2 border-green-200 text-lg text-slate-900 p-6 shadow-lg [&>svg]:text-green-700 *:data-[slot=alert-description]:text-slate-700:leading-relaxed:font-normal',
+          'bg-gradient-to-r from-emerald-50 to-emerald-100/50 border-2 border-emerald-200 text-lg text-slate-900 p-6 shadow-lg [&>svg]:text-emerald-700 *:data-[slot=alert-description]:text-slate-700:leading-relaxed:font-normal',
         warning:
-          'bg-gradient-to-r from-amber-50 to-amber-100/50 border-2 border-amber-200 text-lg text-slate-900 p-6 shadow-lg [&>svg]:text-destructive *:data-[slot=alert-description]:text-slate-700:leading-relaxed:font-normal',
+          'bg-gradient-to-r from-amber-50 to-amber-100/50 border-2 border-amber-200 text-lg text-slate-900 p-6 shadow-lg [&>svg]:text-amber-700 *:data-[slot=alert-description]:text-slate-700:leading-relaxed:font-normal',
         destructive:
-          'bg-gradient-to-r from-red-50 to-red-100/50 border-2 border-red-200 text-lg text-slate-900 p-6 shadow-lg [&>svg]:text-destructive *:data-[slot=alert-description]:text-slate-700',
+          'bg-gradient-to-r from-red-50 to-red-100/50 border-2 border-red-200 text-lg text-slate-900 p-6 shadow-lg [&>svg]:text-red-700 *:data-[slot=alert-description]:text-slate-700',
       },
     },
     defaultVariants: {

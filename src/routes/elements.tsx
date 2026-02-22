@@ -10,7 +10,13 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faEye, faLocationDot } from '@fortawesome/free-solid-svg-icons'
+import {
+  faCircle,
+  faCircleExclamation,
+  faEye,
+  faLocationDot,
+  faTriangleExclamation,
+} from '@fortawesome/free-solid-svg-icons'
 
 import { AppSidebar } from '@/components/app-sidebar'
 import { SidebarRight } from '@/components/sidebar-right'
@@ -177,11 +183,11 @@ function App() {
                         <div id="site-alerts" className="space-y-6">
                           <ComponentDemo title="Site Level Alert Variants">
                             <div className="space-y-4">
-                              <Alert className="relative flex rounded-full py-2 px-3 pr-2 items-center bg-blue-500 border-0 text-white shadow-md backdrop-blur-sm">
+                              <Alert className="relative flex rounded-full py-2 px-3 pr-2 items-center bg-sky-500 border-0 text-white shadow-md backdrop-blur-sm">
                                 <div className="flex items-center gap-4 w-full">
                                   <div className="flex-1 min-w-100">
                                     <div className="flex items-center gap-4">
-                                      <Badge className="bg-blue-100 text-blue-600 uppercase font-bold border-0 rounded-2xl">
+                                      <Badge className="bg-sky-100 text-sky-600 uppercase font-bold border-0 rounded-2xl dark:text-sky-600">
                                         New
                                       </Badge>
                                       <AlertTitle className="flex-1 leading-3.5">
@@ -190,7 +196,7 @@ function App() {
                                     </div>
                                   </div>
                                   <Button
-                                    className="flex-shrink-0 h-6 text-white font-bold rounded-full flex items-center justify-center p-0 bg-blue-400 hover:bg-blue-50:text-blue-600 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 border-0 shadow-md hover:shadow-lg"
+                                    className="flex-shrink-0 h-6 text-white font-bold rounded-full flex items-center justify-center p-0 bg-sky-400 hover:bg-sky-50:text-sky-600 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-500 border-0 shadow-md hover:shadow-lg"
                                     variant="info"
                                   >
                                     Check it out
@@ -207,8 +213,8 @@ function App() {
                             <div className="space-y-4">
                               <Alert className="relative flex">
                                 <div className="flex items-center w-full gap-4">
-                                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-r from-blue-50 to-blue-100/50 border-2 border-blue-200 flex items-center justify-center">
-                                    <Info className="h-6 w-6 text-blue-600" />
+                                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-r from-sky-50 to-sky-100/50 border-2 border-sky-200 flex items-center justify-center">
+                                    <Info className="h-6 w-6 text-sky-600" />
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <AlertTitle className="mb-1">
@@ -227,8 +233,8 @@ function App() {
                                 variant="success"
                               >
                                 <div className="flex items-center w-full gap-4">
-                                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-r from-green-50 to-green-100/50 border-2 border-green-200 flex items-center justify-center">
-                                    <CircleCheckBig className="h-6 w-6 text-green-600" />
+                                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-r from-emerald-50 to-emerald-100/50 border-2 border-emerald-200 flex items-center justify-center">
+                                    <CircleCheckBig className="h-6 w-6 text-emerald-600" />
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <AlertTitle className="mb-1">
@@ -309,10 +315,25 @@ function App() {
                             <Badge>Default</Badge>
                             <Badge variant="secondary">Secondary</Badge>
                             <Badge variant="outline">Outline</Badge>
-                            <Badge variant="destructive">Destructive</Badge>
-                            <Badge variant="information">Information</Badge>
-                            <Badge variant="brand">Successful</Badge>
-                            <Badge variant="warning">Warning</Badge>
+                            <Badge variant="destructive">
+                              <FontAwesomeIcon
+                                icon={faCircleExclamation}
+                                className="h-4 w-4"
+                              />
+                              Destructive
+                            </Badge>
+                            <Badge variant="information">
+                              <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                              Information
+                            </Badge>
+                            <Badge variant="successful">Successful</Badge>
+                            <Badge variant="warning">
+                              <FontAwesomeIcon
+                                icon={faTriangleExclamation}
+                                className="h-4 w-4"
+                              />
+                              Warning
+                            </Badge>
                             <Badge variant="neutral">Neutral</Badge>
                             <Badge variant="location">
                               <FontAwesomeIcon
