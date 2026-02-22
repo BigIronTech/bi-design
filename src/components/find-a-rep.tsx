@@ -319,7 +319,7 @@ function RepCard({ rep }: { rep: Rep }) {
             <p className="font-semibold text-foreground text-lg leading-tight">
               {rep.name}
             </p>
-            <p className="text-lg text-muted-foreground mt-0.5">{rep.title}</p>
+            <p className="text-md text-muted-foreground mt-0.5">{rep.title}</p>
           </div>
           <span
             className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full border ${c.badge} whitespace-nowrap`}
@@ -328,16 +328,16 @@ function RepCard({ rep }: { rep: Rep }) {
             {rep.type}
           </span>
         </div>
-        <p className="text-md text-muted-foreground mt-2 leading-relaxed">
+        <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
           {rep.bio}
         </p>
         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5">
           <a
             href={`tel:${rep.phone}`}
-            className={`cursor-pointer inline-flex items-center gap-1.5 text-lg font-medium ${c.accent} hover:underline`}
+            className={`cursor-pointer inline-flex items-center gap-1.5 text-md font-medium ${c.accent} hover:underline`}
           >
             <svg
-              className="w-6 h-6 flex-shrink-0"
+              className="w-5 h-5 flex-shrink-0"
               fill="currentColor"
               stroke="currentColor"
               strokeWidth={0}
@@ -353,10 +353,10 @@ function RepCard({ rep }: { rep: Rep }) {
           </a>
           <a
             href={`mailto:${rep.email}`}
-            className={`cursor-pointer inline-flex items-center gap-1.5 text-lg font-medium ${c.accent} hover:underline`}
+            className={`cursor-pointer inline-flex items-center gap-1.5 text-md font-medium ${c.accent} hover:underline`}
           >
             <svg
-              className="w-6 h-6 flex-shrink-0"
+              className="w-5 h-5 flex-shrink-0"
               fill="none"
               stroke="currentColor"
               strokeWidth={2}
