@@ -6,7 +6,7 @@ export default function BigIronHeader() {
     <div className="w-full">
       {/* Top bar - black */}
       <div className="bg-black text-white px-4">
-        <div className="max-w-[1500px] h-[60px] gap-10 flex items-center w-full justify-between">
+        <div className="max-w-[1500px] h-[60px] gap-10 flex items-center w-full justify-between mx-auto">
           {/* Logo */}
           <div className="flex items-center w-auto">
             <svg
@@ -125,7 +125,7 @@ export default function BigIronHeader() {
           {/* Auctions */}
           <button className="inline-flex items-center border-neutral-500 h-full gap-1.5 px-0 pr-3 hover:text-white border-r">
             <svg
-              className="h-4 w-4 block lg:hidden xl:block"
+              className="h-4 w-4 block lg:hidden 2xl:block"
               fill="currentColor"
               stroke="none"
               viewBox="0 0 576 512"
@@ -145,7 +145,7 @@ export default function BigIronHeader() {
           {/* Farm Equipment */}
           <button className="inline-flex items-center border-neutral-500 h-full gap-1.5 px-0 pr-3 hover:text-white border-r">
             <svg
-              className="h-4 w-4 block lg:hidden xl:block"
+              className="h-4 w-4 block lg:hidden 2xl:block"
               fill="currentColor"
               viewBox="0 0 576 512"
             >
@@ -165,7 +165,7 @@ export default function BigIronHeader() {
           {/* Construction */}
           <button className="inline-flex items-center border-neutral-500 h-full gap-1.5 px-0 pr-3 hover:text-white border-r">
             <svg
-              className="h-4 w-4 block lg:hidden xl:block"
+              className="h-4 w-4 block lg:hidden 2xl:block"
               fill="currentColor"
               viewBox="0 0 576 512"
             >
@@ -185,7 +185,7 @@ export default function BigIronHeader() {
           {/* Transportation */}
           <button className="inline-flex items-center border-neutral-500 h-full gap-1.5 px-0 pr-3 hover:text-white border-r">
             <svg
-              className="h-4 w-4 block lg:hidden xl:block"
+              className="h-4 w-4 block lg:hidden 2xl:block"
               fill="currentColor"
               viewBox="0 0 576 512"
             >
@@ -204,7 +204,7 @@ export default function BigIronHeader() {
           {/* Industrial */}
           <button className="inline-flex items-center border-neutral-500 h-full gap-1.5 px-0 pr-3 hover:text-white border-r">
             <svg
-              className="h-4 w-4 block lg:hidden xl:block"
+              className="h-4 w-4 block lg:hidden 2xl:block"
               fill="currentColor"
               viewBox="0 0 640 512"
             >
@@ -223,7 +223,7 @@ export default function BigIronHeader() {
           {/* Real Estate */}
           <button className="inline-flex items-center border-neutral-500 h-full gap-1.5 px-0 pr-3 hover:text-white border-r">
             <svg
-              className="h-4 w-4 block lg:hidden xl:block"
+              className="h-4 w-4 block lg:hidden 2xl:block"
               fill="currentColor"
               viewBox="0 0 512 512"
             >
@@ -243,7 +243,7 @@ export default function BigIronHeader() {
           {/* Livestock */}
           <button className="inline-flex items-center border-neutral-500 h-full gap-1.5 px-0 pr-3 hover:text-white border-r">
             <svg
-              className="h-4 w-4 block lg:hidden xl:block"
+              className="h-4 w-4 block lg:hidden 2xl:block"
               fill="currentColor"
               viewBox="0 0 640 512"
             >
@@ -262,7 +262,7 @@ export default function BigIronHeader() {
           {/* Collector Cars */}
           <button className="inline-flex items-center border-neutral-500 h-full gap-1.5 px-0 pr-3 hover:text-white border-r">
             <svg
-              className="h-4 w-4 block lg:hidden xl:block"
+              className="h-4 w-4 block lg:hidden 2xl:block"
               fill="currentColor"
               viewBox="0 0 512 512"
             >
@@ -281,7 +281,7 @@ export default function BigIronHeader() {
           {/* Services */}
           <button className="inline-flex items-center border-neutral-500 h-full gap-1.5 px-0 pr-4 hover:text-white border-r">
             <svg
-              className="h-4 w-4 block lg:hidden xl:block"
+              className="h-4 w-4 block lg:hidden 2xl:block"
               fill="currentColor"
               viewBox="0 0 512 512"
             >
@@ -300,11 +300,7 @@ export default function BigIronHeader() {
 
           {/* IronExchange */}
           <button className="inline-flex items-center border-neutral-500 h-full gap-1.5 px-0 pr-0 sm:pr-4 hover:text-white">
-            <svg
-              className="h-4 w-4 block lg:hidden xl:block"
-              fill="currentColor"
-              viewBox="0 0 432 540"
-            >
+            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 432 540">
               <path d="M76.5 50.5c-14.3 0-28.1 5.7-38.2 15.8L12.8 91.8C2.7 101.9-3 115.7-3 130S2.7 158 12.8 168.2l89.1 89.1c7 7 7 18.4 0 25.5L12.8 371.8C2.7 382-3 395.7-3 410s5.7 28.1 15.8 38.2l25.5 25.5c10.1 10.1 23.9 15.8 38.2 15.8s28.1-5.7 38.2-15.8l89.1-89.1c7-7 18.4-7 25.5 0l89.1 89.1c21.1 21.1 55.3 21.1 76.4 0l25.5-25.5c10.1-10.1 15.8-23.9 15.8-38.2s-5.7-28.1-15.8-38.2L331 282.7c-7-7-7-18.4 0-25.5l89.1-89.1c21.1-21.1 21.1-55.3 0-76.4L394.7 66.4c-10.1-10.1-23.9-15.8-38.2-15.8s-28.1 5.7-38.2 15.8l-89.1 89.1c-7 7-18.4 7-25.5 0L114.6 66.4C104.5 56.2 90.8 50.5 76.5 50.5zm0 54L51 130c-5.3 5.3-13.8 5.3-19.1 0s-5.3-13.8 0-19.1L57.4 85.4c5.3-5.3 13.8-5.3 19.1 0s5.3 13.8 0 19.1zm280 0l-89.1 89.1c-14.1 14.1-32.5 21.1-50.9 21.1-7.5 0-13.5-6-13.5-13.5s6-13.5 13.5-13.5c11.5 0 23-4.4 31.8-13.2l89.1-89.1c5.3-5.3 13.8-5.3 19.1 0s5.3 13.8 0 19.1zM161.2 270c0 18.4-7 36.9-21.1 50.9L51 410c-5.3 5.3-13.8 5.3-19.1 0s-5.3-13.8 0-19.1L121 301.8c8.8-8.8 13.2-20.3 13.2-31.8 0-7.5 6-13.5 13.5-13.5s13.5 6 13.5 13.5z" />
             </svg>
             <span className="hidden sm:inline">IronExchange</span>
