@@ -173,7 +173,7 @@ const RepLocationMap = forwardRef<RepLocationMapHandle, RepLocationMapProps>(
         })
 
         // Fit bounds to show all markers with some padding
-        //if (repLocations.length > 0) {
+        // if (repLocations.length > 0) {
         //  const bounds = L.latLngBounds(repLocations.map((r) => [r.lat, r.lng]))
         //  map.fitBounds(bounds, { padding: [50, 50] })
         // }
