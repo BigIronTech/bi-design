@@ -58,7 +58,7 @@ const RepLocationMap = forwardRef<RepLocationMapHandle, RepLocationMapProps>(
           doubleClickZoom: false,
           boxZoom: false,
           keyboard: false,
-        }).setView([39.5, -98.5], 5) // Center on central US
+        }).setView([39.5, -98.5], 4) // Center on central US
 
         mapInstanceRef.current = map
 
@@ -173,10 +173,10 @@ const RepLocationMap = forwardRef<RepLocationMapHandle, RepLocationMapProps>(
         })
 
         // Fit bounds to show all markers with some padding
-        if (repLocations.length > 0) {
-          const bounds = L.latLngBounds(repLocations.map((r) => [r.lat, r.lng]))
-          map.fitBounds(bounds, { padding: [50, 50] })
-        }
+        //if (repLocations.length > 0) {
+        //  const bounds = L.latLngBounds(repLocations.map((r) => [r.lat, r.lng]))
+        //  map.fitBounds(bounds, { padding: [50, 50] })
+        // }
       })
 
       // Cleanup on unmount
