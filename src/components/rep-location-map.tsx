@@ -194,7 +194,7 @@ const RepLocationMap = forwardRef<RepLocationMapHandle, RepLocationMapProps>(
         <div
           ref={mapRef}
           className="w-full flex-1 rounded-lg"
-          style={{ background: '#f8f9fa', minHeight: '30px' }}
+          style={{ background: '#f8f9fa', minHeight: '300px' }}
         />
 
         {/* Overlay info bar at bottom */}
