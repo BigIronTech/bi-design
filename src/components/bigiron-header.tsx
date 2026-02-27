@@ -121,7 +121,7 @@ export default function BigIronHeader() {
 
       {/* Sub-nav - dark gray */}
       <div className="bg-neutral-700 border-t py-0.5 border-neutral-700">
-        <nav className="max-w-[1500px] mx-auto h-[42px] flex items-center gap-3 px-4 py-3 text-xs font-semibold text-gray-200">
+        <nav className="max-w-[1500px] mx-auto h-[42px] flex items-center gap-3 px-4 py-3 text-xs font-semibold text-gray-200 justify-between">
           {/* Auctions */}
           <button className="inline-flex items-center border-neutral-500 h-full gap-1.5 px-0 pr-3 hover:text-white border-r">
             <svg
@@ -299,7 +299,7 @@ export default function BigIronHeader() {
           </button>
 
           {/* IronExchange */}
-          <button className="inline-flex items-center border-neutral-500 h-full gap-1.5 px-0 pr-4 hover:text-white">
+          <button className="inline-flex items-center border-neutral-500 h-full gap-1.5 px-0 pr-0 sm:pr-4 hover:text-white">
             <svg
               className="h-4 w-4 block lg:hidden xl:block"
               fill="currentColor"
