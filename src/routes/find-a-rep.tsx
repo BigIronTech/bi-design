@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import React from 'react'
 import FindMySalesRep from '@/components/find-a-rep'
+import BigIronHeader from '@/components/bigiron-header'
 import { AppSidebar } from '@/components/app-sidebar'
 import {
   Breadcrumb,
@@ -67,6 +68,10 @@ function FindMySalesRepWrapper({ children }: { children: React.ReactNode }) {
           <ButtonToggle />
         </div>
       </header>
+
+      {/* BigIron.com header preview */}
+      <BigIronHeader />
+
       {children}
     </SidebarInset>
   )
@@ -77,7 +82,7 @@ function FindMySalesRepPage() {
     <SidebarProvider>
       <AppSidebar />
       <FindMySalesRepWrapper>
-        <main className="flex flex-1 flex-col gap-4 p-0 lg:gap-6 lg:p-6 bg-sidebar">
+        <main className="flex flex-1 flex-col gap-4 p-0 lg:gap-6 lg:p-6 bg-white w-full max-w-[1500px] mx-auto">
           <FindMySalesRep />
         </main>
       </FindMySalesRepWrapper>
