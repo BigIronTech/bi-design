@@ -1532,9 +1532,9 @@ export default function FindMySalesRepSidebar() {
           <div className="flex flex-col gap-6">
             {/* Quick Find */}
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-800 p-4">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between gap-4 flex-row lg:flex-col xl:flex-row">
                 <div className="flex items-center gap-3 flex-1">
-                  <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-emerald-600 items-center justify-center flex-shrink-0 hidden sm:flex">
                     <svg
                       className="w-5 h-5 text-white"
                       fill="currentColor"
@@ -1554,7 +1554,8 @@ export default function FindMySalesRepSidebar() {
                       Quick Find Your Rep
                     </p>
                     <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
-                      Automatically detect your location
+                      Automatically detect{' '}
+                      <span className="whitespace-nowrap">your location</span>
                     </p>
                   </div>
                 </div>
@@ -1584,8 +1585,8 @@ export default function FindMySalesRepSidebar() {
                           d="M288-16c13.3 0 24 10.7 24 24l0 25.3C416.5 44.4 499.6 127.5 510.7 232l25.3 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-25.3 0C499.6 384.5 416.5 467.6 312 478.7l0 25.3c0 13.3-10.7 24-24 24s-24-10.7-24-24l0-25.3C159.5 467.6 76.4 384.5 65.3 280L40 280c-13.3 0-24-10.7-24-24s10.7-24 24-24l25.3 0C76.4 127.5 159.5 44.4 264 33.3L264 8c0-13.3 10.7-24 24-24zM464 256a176 176 0 1 0 -352 0 176 176 0 1 0 352 0zm-112 0a64 64 0 1 0 -128 0 64 64 0 1 0 128 0zm-176 0a112 112 0 1 1 224 0 112 112 0 1 1 -224 0z"
                         />
                       </svg>
-                      <span className="hidden xl:inline">Use Location</span>
-                      <span className="xl:hidden">Use</span>
+                      <span>Use Location</span>
+                      {/* <span className="sm:hidden">Use</span> */}
                     </>
                   )}
                 </button>
