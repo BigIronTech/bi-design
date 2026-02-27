@@ -82,7 +82,7 @@ function FindMySalesRepPage() {
     <SidebarProvider>
       <AppSidebar />
       <FindMySalesRepWrapper>
-        <main className="flex flex-1 flex-col gap-4 p-0 lg:gap-6 lg:p-6 bg-background w-full max-w-[1500px] mx-auto">
+        <main className="flex flex-1 flex-col gap-4 p-0 pb-6 lg:gap-6 lg:p-6 lg:pb-8 bg-background w-full max-w-[1500px] mx-auto">
           <FindMySalesRep />
         </main>
       </FindMySalesRepWrapper>
