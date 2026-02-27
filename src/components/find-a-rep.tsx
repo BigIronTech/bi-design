@@ -1227,6 +1227,7 @@ export default function FindMySalesRepSidebar() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('All')
   const [selectedRep, setSelectedRep] = useState<RepWithDistance | null>(null)
   const [gettingLocation, setGettingLocation] = useState(false)
+  const [usedGeolocation, setUsedGeolocation] = useState(false) // ADDED THIS LINE
   const formRef = useRef<HTMLFormElement>(null)
   const mapRef = useRef<RepLocationMapHandle>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
@@ -1384,6 +1385,7 @@ export default function FindMySalesRepSidebar() {
     setSearched(false)
     setLoading(true)
     setActiveFilter('All')
+    setUsedGeolocation(false) // ADDED THIS LINE
     setTimeout(() => {
       setLoading(false)
       setSearched(true)
@@ -1403,12 +1405,14 @@ export default function FindMySalesRepSidebar() {
     setLoading(false)
     setActiveFilter('All')
     setSelectedRep(null)
+    setUsedGeolocation(false) // ADDED THIS LINE
   }
 
   function handleStateClick(stateCode: string) {
     setSelectedState(stateCode)
     setSearched(false)
     setLoading(false)
+    setUsedGeolocation(false) // ADD THIS LINE
 
     setTimeout(() => {
       formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -1433,6 +1437,7 @@ export default function FindMySalesRepSidebar() {
     setSearched(false)
     setLoading(false)
     setCounty('')
+    setUsedGeolocation(false) // ADDED THIS LINE
 
     setTimeout(() => {
       const selectedRepSection = document.getElementById('selected-rep-section')
@@ -1482,6 +1487,7 @@ export default function FindMySalesRepSidebar() {
         }
 
         setGettingLocation(false)
+        setUsedGeolocation(true) // ADDED THIS LINE
 
         setTimeout(() => {
           formRef.current?.scrollIntoView({
@@ -1601,7 +1607,11 @@ export default function FindMySalesRepSidebar() {
                   <div className="flex flex-col gap-1.5">
                     <h2 className="text-xl">Best Match</h2>
                     <p className="text-md text-foreground">
-                      Enter your county for the most accurate rep match
+                      Enter your{' '}
+                      <strong>
+                        <u>county</u>
+                      </strong>{' '}
+                      for the most accurate rep match
                     </p>
                     <label className="text-sm font-medium text-foreground">
                       State <span className="text-destructive">*</span>
@@ -1673,9 +1683,6 @@ export default function FindMySalesRepSidebar() {
                         <option key={countyName} value={countyName} />
                       ))}
                     </datalist>
-                    <p className="text-xs text-muted-foreground">
-                      💡 Enter your county for the most accurate rep match
-                    </p>
                   </div>
                 </div>
 
@@ -1720,13 +1727,63 @@ export default function FindMySalesRepSidebar() {
 
           {/* Right: Map (2 columns) - Matches height of left column */}
           <div className="lg:col-span-2">
-            <div className="h-full">
+            <div className="h-full relative">
               <RepLocationMap
                 ref={mapRef}
                 onStateClick={handleStateClick}
                 onRepClick={handleRepClick}
                 repLocations={repLocations}
               />
+              {/* ADD THIS ENTIRE BANNER SECTION */}
+              {usedGeolocation && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] w-[90%] max-w-md">
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-4 shadow-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0">
+                        <svg
+                          className="w-5 h-5 text-blue-600 dark:text-blue-400"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                          />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                          Location Detected
+                        </h3>
+                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                          Use the form for the most accurate results.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setUsedGeolocation(false)}
+                        className="flex-shrink-0 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
