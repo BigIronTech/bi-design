@@ -1511,7 +1511,7 @@ export default function FindMySalesRepSidebar() {
     <div className="flex flex-col gap-6 w-full">
       {/* Page Header */}
       <div className="px-4 sm:px-6 max-w-[1500px] mx-auto w-full">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+        <h1 className="!text-3xl font-semibold tracking-tight text-foreground">
           Find My Sales Rep
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
