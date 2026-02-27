@@ -1048,10 +1048,10 @@ const TYPE_CONFIG: Record<
   },
   Livestock: {
     accent: 'text-yellow-900 dark:text-yellow-700',
-    bg: 'bg-yellow-50 dark:bg-yellow-950/20',
-    border: 'border-yellow-200 dark:border-yellow-800',
+    bg: 'bg-yellow-900/10 dark:bg-yellow-950/20',
+    border: 'border-yellow-900/20 dark:border-yellow-800',
     badge:
-      'bg-yellow-100 text-yellow-900 border-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-400 dark:border-yellow-800',
+      'bg-yellow-900/10 text-yellow-900 border-yellow-900/20 dark:bg-yellow-900/40 dark:text-yellow-400 dark:border-yellow-800',
     dot: 'bg-yellow-900',
     ring: 'ring-yellow-700',
   },
