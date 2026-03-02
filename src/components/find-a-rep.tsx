@@ -1094,10 +1094,10 @@ function SkeletonCard({ type }: { type: RepType }) {
   const c = TYPE_CONFIG[type]
   return (
     <div
-      className={`rounded-lg border ${c.border} ${c.bg} p-4 flex flex-col items-center h-full`}
+      className={`rounded-lg border ${c.border} ${c.bg} px-4 pt-6 pb-4 flex flex-col items-center h-full`}
     >
       <div
-        className={`w-30 aspect-square rounded-full flex-shrink-0 bg-muted animate-pulse ring-4 ${c.ring} ring-offset-2 mb-3 max-h-30`}
+        className={`w-24 aspect-square rounded-full flex-shrink-0 bg-muted animate-pulse ring-4 ${c.ring} ring-offset-2 mb-3 max-h-24`}
       />
       <div className="w-full space-y-2 flex flex-col items-center">
         <div className="h-4 w-28 bg-muted rounded animate-pulse" />
@@ -1120,11 +1120,11 @@ function RepCard({ rep }: { rep: RepWithDistance | Rep }) {
   const c = TYPE_CONFIG[rep.type]
   return (
     <div
-      className={`rounded-lg border ${c.border} ${c.bg} px-4 pt-10 pb-4 flex flex-col items-center text-center hover:shadow-md transition-shadow duration-150 h-full`}
+      className={`rounded-lg border ${c.border} ${c.bg} px-4 pt-6 pb-4 flex flex-col items-center text-center hover:shadow-md transition-shadow duration-150 h-full`}
     >
       {/* Photo - large, takes up generous space */}
       <div
-        className={`w-30 aspect-square rounded-full overflow-hidden bg-muted mb-3 ring-4 ${c.ring} ring-offset-2 flex-shrink-0 max-h-30`}
+        className={`w-24 aspect-square rounded-full overflow-hidden bg-muted mb-3 ring-4 ${c.ring} ring-offset-2 flex-shrink-0 max-h-24`}
       >
         <img
           src={rep.photo}
@@ -1245,7 +1245,7 @@ function ResultsPanel({
 
   if (loading) {
     return (
-      <div className="h-full grid grid-cols-4 lg:grid-cols-2 gap-3">
+      <div className="h-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-3">
         <SkeletonCard type="Equipment" />
         <SkeletonCard type="Livestock" />
         <SkeletonCard type="Real Estate" />
@@ -1279,7 +1279,7 @@ function ResultsPanel({
       (a, b) => typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type),
     )
     return (
-      <div className="h-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-3">
+      <div className="h-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-3">
         {sorted.map((rep) => (
           <RepCard key={`${rep.id}-${rep.type}`} rep={rep} />
         ))}
@@ -1386,6 +1386,15 @@ export default function FindMySalesRepSidebar() {
     setTimeout(() => {
       setLoading(false)
       setSearched(true)
+      // On mobile (< lg breakpoint), scroll down to results
+      if (window.innerWidth < 1024) {
+        setTimeout(() => {
+          resultsRef.current?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          })
+        }, 50)
+      }
     }, 1200)
   }
 
@@ -1654,7 +1663,7 @@ export default function FindMySalesRepSidebar() {
           </div>
 
           {/* Right: Results (2 columns) */}
-          <div ref={resultsRef} className="lg:col-span-2 flex">
+          <div ref={resultsRef} className="lg:col-span-2 flex scroll-mt-4">
             <div className="flex-1">
               <ResultsPanel
                 loading={loading}
