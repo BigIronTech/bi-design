@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 // ─── Image helper ─────────────────────────────────────────────────────────────
 const img = (filename: string) => `${import.meta.env.BASE_URL}${filename}`
@@ -1089,6 +1089,252 @@ function calculateDistance(
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
 }
 
+// ─── County Typeahead ─────────────────────────────────────────────────────────
+function CountyTypeahead({
+  value,
+  onChange,
+  counties,
+  disabled,
+  required,
+}: {
+  value: string
+  onChange: (val: string) => void
+  counties: Array<string>
+  disabled: boolean
+  required: boolean
+}) {
+  const [inputValue, setInputValue] = useState(value)
+  const [open, setOpen] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(-1)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Sync external value changes (e.g. reset)
+  useEffect(() => {
+    setInputValue(value)
+  }, [value])
+
+  const filtered = useMemo(() => {
+    if (!inputValue.trim()) return counties
+    const lower = inputValue.toLowerCase()
+    return counties.filter((c) => c.toLowerCase().includes(lower))
+  }, [inputValue, counties])
+
+  // Close on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false)
+        setActiveIndex(-1)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  // Scroll active item into view
+  useEffect(() => {
+    if (activeIndex >= 0 && listRef.current) {
+      const item = listRef.current.children[activeIndex] as HTMLElement
+      item.scrollIntoView({ block: 'nearest' })
+    }
+  }, [activeIndex])
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const val = e.target.value
+    setInputValue(val)
+    onChange(val)
+    setOpen(true)
+    setActiveIndex(-1)
+  }
+
+  function handleSelect(countyName: string) {
+    setInputValue(countyName)
+    onChange(countyName)
+    setOpen(false)
+    setActiveIndex(-1)
+    inputRef.current?.blur()
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!open) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+        setOpen(true)
+        setActiveIndex(0)
+        e.preventDefault()
+      }
+      return
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActiveIndex((i) => Math.min(i + 1, filtered.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActiveIndex((i) => Math.max(i - 1, 0))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (activeIndex >= 0 && filtered[activeIndex]) {
+        handleSelect(filtered[activeIndex])
+      } else if (filtered.length === 1) {
+        handleSelect(filtered[0])
+      }
+    } else if (e.key === 'Escape') {
+      setOpen(false)
+      setActiveIndex(-1)
+    } else if (e.key === 'Tab') {
+      if (activeIndex >= 0 && filtered[activeIndex]) {
+        handleSelect(filtered[activeIndex])
+      }
+      setOpen(false)
+    }
+  }
+
+  function handleClear() {
+    setInputValue('')
+    onChange('')
+    setOpen(false)
+    inputRef.current?.focus()
+  }
+
+  const showDropdown = open && !disabled && filtered.length > 0
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputValue}
+          onChange={handleInputChange}
+          onFocus={() => {
+            if (!disabled) setOpen(true)
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder={disabled ? 'Select state first' : 'Type to search…'}
+          required={required}
+          disabled={disabled}
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={showDropdown}
+          aria-autocomplete="list"
+          aria-haspopup="listbox"
+          aria-activedescendant={
+            activeIndex >= 0 ? `county-option-${activeIndex}` : undefined
+          }
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 pr-8 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        />
+
+        {/* Clear button or chevron */}
+        {inputValue && !disabled ? (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            tabIndex={-1}
+            aria-label="Clear county"
+          >
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        ) : (
+          <svg
+            className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        )}
+      </div>
+
+      {/* Dropdown */}
+      {showDropdown && (
+        <ul
+          ref={listRef}
+          role="listbox"
+          aria-label="County options"
+          className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md overflow-auto max-h-52 py-1 text-sm"
+        >
+          {filtered.map((countyName, index) => {
+            const isActive = index === activeIndex
+            // Highlight matching portion
+            const lower = inputValue.toLowerCase()
+            const matchStart = countyName.toLowerCase().indexOf(lower)
+            const hasMatch = inputValue.length > 0 && matchStart !== -1
+
+            return (
+              <li
+                key={countyName}
+                id={`county-option-${index}`}
+                role="option"
+                aria-selected={isActive}
+                onMouseDown={(e) => {
+                  // prevent input blur before click registers
+                  e.preventDefault()
+                  handleSelect(countyName)
+                }}
+                onMouseEnter={() => setActiveIndex(index)}
+                className={`flex items-center px-3 py-1.5 cursor-pointer select-none transition-colors ${
+                  isActive
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-foreground hover:bg-accent/50'
+                }`}
+              >
+                {hasMatch ? (
+                  <>
+                    {countyName.slice(0, matchStart)}
+                    <span className="font-semibold">
+                      {countyName.slice(
+                        matchStart,
+                        matchStart + inputValue.length,
+                      )}
+                    </span>
+                    {countyName.slice(matchStart + inputValue.length)}
+                  </>
+                ) : (
+                  countyName
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      {/* No results hint */}
+      {open &&
+        !disabled &&
+        inputValue.trim().length > 0 &&
+        filtered.length === 0 && (
+          <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md px-3 py-2 text-sm text-muted-foreground">
+            No counties found. You can still search with this name.
+          </div>
+        )}
+    </div>
+  )
+}
+
 // ─── Skeleton Card ────────────────────────────────────────────────────────────
 function SkeletonCard({ type }: { type: RepType }) {
   const c = TYPE_CONFIG[type]
@@ -1097,20 +1343,64 @@ function SkeletonCard({ type }: { type: RepType }) {
       className={`rounded-lg border ${c.border} ${c.bg} px-4 pt-6 pb-4 flex flex-col items-center h-full`}
     >
       <div
-        className={`w-24 aspect-square rounded-full flex-shrink-0 bg-muted animate-pulse ring-4 ${c.ring} ring-offset-2 mb-3 max-h-24`}
+        className={`w-24 aspect-square rounded-full flex-shrink-0 ring-4 ${c.ring} ring-offset-2 mb-3 max-h-24`}
+        style={{
+          background:
+            'linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite',
+        }}
       />
       <div className="w-full space-y-2 flex flex-col items-center">
-        <div className="h-4 w-28 bg-muted rounded animate-pulse" />
-        <div className="h-3 w-20 bg-muted rounded animate-pulse" />
+        <div
+          className="h-4 w-28 rounded"
+          style={{
+            background:
+              'linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.5s infinite',
+          }}
+        />
+        <div
+          className="h-3 w-20 rounded"
+          style={{
+            background:
+              'linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.5s infinite 0.1s',
+          }}
+        />
         <span
           className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${c.badge} opacity-60 whitespace-nowrap`}
         >
           <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
           {type}
         </span>
-        <div className="h-3 w-24 bg-muted rounded animate-pulse" />
-        <div className="h-3 w-28 bg-muted rounded animate-pulse" />
+        <div
+          className="h-3 w-24 rounded"
+          style={{
+            background:
+              'linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.5s infinite 0.2s',
+          }}
+        />
+        <div
+          className="h-3 w-28 rounded"
+          style={{
+            background:
+              'linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.5s infinite 0.3s',
+          }}
+        />
       </div>
+      <style>{`
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
     </div>
   )
 }
@@ -1122,7 +1412,6 @@ function RepCard({ rep }: { rep: RepWithDistance | Rep }) {
     <div
       className={`rounded-lg border ${c.border} ${c.bg} px-4 pt-6 pb-4 flex flex-col items-center text-center hover:shadow-md transition-shadow duration-150 h-full`}
     >
-      {/* Photo - large, takes up generous space */}
       <div
         className={`w-24 aspect-square rounded-full overflow-hidden bg-muted mb-3 ring-4 ${c.ring} ring-offset-2 flex-shrink-0 max-h-24`}
       >
@@ -1146,7 +1435,6 @@ function RepCard({ rep }: { rep: RepWithDistance | Rep }) {
         />
       </div>
 
-      {/* Name and Title */}
       <div className="mb-2.5">
         <p className="font-semibold text-foreground text-sm leading-tight">
           {rep.name}
@@ -1154,7 +1442,6 @@ function RepCard({ rep }: { rep: RepWithDistance | Rep }) {
         <p className="text-xs text-muted-foreground mt-0.5">{rep.title}</p>
       </div>
 
-      {/* Badge */}
       <span
         className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${c.badge} whitespace-nowrap mb-3`}
       >
@@ -1162,7 +1449,6 @@ function RepCard({ rep }: { rep: RepWithDistance | Rep }) {
         {rep.type}
       </span>
 
-      {/* Contact Info - pushed to bottom */}
       <div className="flex flex-col gap-1.5 w-full mt-auto">
         <a
           href={`tel:${rep.phone}`}
@@ -1215,9 +1501,20 @@ function ResultsPanel({
 }: {
   loading: boolean
   hasSearched: boolean
-  results: RepWithDistance[]
+  results: Array<RepWithDistance>
 }) {
-  if (!loading && !hasSearched) {
+  if (loading) {
+    return (
+      <div className="h-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-3">
+        <SkeletonCard type="Equipment" />
+        <SkeletonCard type="Livestock" />
+        <SkeletonCard type="Real Estate" />
+        <SkeletonCard type="Classic Car" />
+      </div>
+    )
+  }
+
+  if (!hasSearched) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center p-8 rounded-lg border border-dashed border-border bg-muted/30 min-h-[320px]">
         <svg
@@ -1243,18 +1540,7 @@ function ResultsPanel({
     )
   }
 
-  if (loading) {
-    return (
-      <div className="h-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-3">
-        <SkeletonCard type="Equipment" />
-        <SkeletonCard type="Livestock" />
-        <SkeletonCard type="Real Estate" />
-        <SkeletonCard type="Classic Car" />
-      </div>
-    )
-  }
-
-  if (hasSearched && results.length === 0) {
+  if (results.length === 0) {
     return (
       <div className="h-full rounded-lg border border-border bg-card p-10 text-center flex flex-col items-center justify-center min-h-[320px]">
         <p className="text-sm font-medium text-foreground">
@@ -1268,26 +1554,22 @@ function ResultsPanel({
     )
   }
 
-  if (hasSearched && results.length > 0) {
-    const typeOrder: RepType[] = [
-      'Equipment',
-      'Livestock',
-      'Real Estate',
-      'Classic Car',
-    ]
-    const sorted = [...results].sort(
-      (a, b) => typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type),
-    )
-    return (
-      <div className="h-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-3">
-        {sorted.map((rep) => (
-          <RepCard key={`${rep.id}-${rep.type}`} rep={rep} />
-        ))}
-      </div>
-    )
-  }
-
-  return null
+  const typeOrder: Array<RepType> = [
+    'Equipment',
+    'Livestock',
+    'Real Estate',
+    'Classic Car',
+  ]
+  const sorted = [...results].sort(
+    (a, b) => typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type),
+  )
+  return (
+    <div className="h-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-3">
+      {sorted.map((rep) => (
+        <RepCard key={`${rep.id}-${rep.type}`} rep={rep} />
+      ))}
+    </div>
+  )
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -1337,7 +1619,7 @@ export default function FindMySalesRepSidebar() {
 
     matchingReps.sort((a, b) => a.distance - b.distance)
 
-    const types: RepType[] = [
+    const types: Array<RepType> = [
       'Real Estate',
       'Equipment',
       'Livestock',
@@ -1372,11 +1654,10 @@ export default function FindMySalesRepSidebar() {
   }, [searched, selectedState, county])
 
   const hasSearched = searched && !!selectedState && !!county.trim()
-  const stateName = US_STATES.find((s) => s.code === selectedState)?.name
 
   const availableCounties = useMemo(() => {
     if (!selectedState) return []
-    return STATE_COUNTIES[selectedState] || []
+    return (STATE_COUNTIES[selectedState] || []).slice().sort()
   }, [selectedState])
 
   function handleSearch(e: React.FormEvent) {
@@ -1386,7 +1667,6 @@ export default function FindMySalesRepSidebar() {
     setTimeout(() => {
       setLoading(false)
       setSearched(true)
-      // On mobile (< lg breakpoint), scroll down to results
       if (window.innerWidth < 1024) {
         setTimeout(() => {
           resultsRef.current?.scrollIntoView({
@@ -1472,10 +1752,10 @@ export default function FindMySalesRepSidebar() {
           {/* Left: Quick Find + Form */}
           <div className="flex flex-col gap-6">
             {/* Quick Find */}
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-800 p-4">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-4">
               <div className="flex items-center justify-between gap-4 flex-row lg:flex-col xl:flex-row">
                 <div className="flex items-center gap-3 flex-1">
-                  <div className="w-10 h-10 rounded-full bg-emerald-600 items-center justify-center flex-shrink-0 hidden sm:flex">
+                  <div className="w-10 h-10 rounded-full bg-blue-600 items-center justify-center flex-shrink-0 hidden sm:flex">
                     <svg
                       className="w-5 h-5 text-white"
                       fill="currentColor"
@@ -1491,10 +1771,10 @@ export default function FindMySalesRepSidebar() {
                     </svg>
                   </div>
                   <div>
-                    <p className="text-sm font-semibold !mb-0.5 text-emerald-900 dark:text-emerald-100">
+                    <p className="text-sm font-semibold !mb-0.5 text-blue-900 dark:text-blue-100">
                       Quick Find Your Rep
                     </p>
-                    <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
+                    <p className="text-xs text-blue-500 dark:text-blue-300 mt-0.5">
                       Automatically detect{' '}
                       <span className="whitespace-nowrap">your location</span>
                     </p>
@@ -1504,7 +1784,7 @@ export default function FindMySalesRepSidebar() {
                   type="button"
                   onClick={handleUseMyLocation}
                   disabled={gettingLocation}
-                  className="cursor-pointer inline-flex items-center gap-2 h-9 px-4 rounded-md bg-emerald-600 text-white text-sm font-medium shadow-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                  className="cursor-pointer inline-flex items-center gap-2 h-9 px-4 rounded-md bg-blue-600 border-blue-200 dark:bg-blue-950/20 text-white dark:text-blue-400 text-sm font-medium shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
                 >
                   {gettingLocation ? (
                     <>
@@ -1592,33 +1872,22 @@ export default function FindMySalesRepSidebar() {
                         </svg>
                       </div>
                     </div>
-                    {/* County */}
+
+                    {/* County Typeahead */}
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-medium text-foreground">
                         County <span className="text-destructive">*</span>
                       </label>
-                      <input
-                        type="text"
+                      <CountyTypeahead
                         value={county}
-                        onChange={(e) => {
-                          setCounty(e.target.value)
+                        onChange={(val) => {
+                          setCounty(val)
                           setSearched(false)
                         }}
-                        list="county-list"
-                        placeholder={
-                          selectedState
-                            ? 'Type county...'
-                            : 'Select state first'
-                        }
-                        required
+                        counties={availableCounties}
                         disabled={!selectedState}
-                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        required
                       />
-                      <datalist id="county-list">
-                        {availableCounties.map((countyName) => (
-                          <option key={countyName} value={countyName} />
-                        ))}
-                      </datalist>
                     </div>
                   </div>
                 </div>
