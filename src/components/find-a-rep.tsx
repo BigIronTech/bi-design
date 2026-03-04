@@ -1,4 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+  faCarSide,
+  faCow,
+  faSignHanging,
+  faTractor,
+} from '@fortawesome/free-solid-svg-icons'
 
 // ─── Image helper ─────────────────────────────────────────────────────────────
 const img = (filename: string) => `${import.meta.env.BASE_URL}${filename}`
@@ -8,11 +15,10 @@ type RepType = 'Equipment' | 'Real Estate' | 'Livestock' | 'Classic Car'
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 const REPRESENTATIVES = [
-  // Nebraska - 5 reps
   {
     id: 1,
     name: 'Tyler Hanson',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(402) 555-0182',
     email: 't.hanson@bigiron.com',
@@ -40,14 +46,14 @@ const REPRESENTATIVES = [
   {
     id: 3,
     name: 'Derek Olson',
-    title: 'Livestock Auctioneer',
+    title: 'Livestock Regional Manager',
     type: 'Livestock' as RepType,
     phone: '(402) 555-0319',
     email: 'd.olson@bigiron.com',
     states: ['NE'],
     counties: ['Lancaster', 'Seward', 'Saline', 'Cass'],
     photo: img('sales2.jpg'),
-    bio: 'Certified livestock auctioneer with experience in cattle markets.',
+    bio: 'Certified livestock Regional Manager with experience in cattle markets.',
     lat: 40.8136,
     lng: -96.7026,
   },
@@ -93,7 +99,6 @@ const REPRESENTATIVES = [
     lat: 41.8667,
     lng: -103.6672,
   },
-  // Nebraska Classic Car
   {
     id: 56,
     name: 'Dave Kincaid',
@@ -108,12 +113,10 @@ const REPRESENTATIVES = [
     lat: 40.8136,
     lng: -96.7026,
   },
-
-  // Iowa - 5 reps
   {
     id: 7,
     name: 'Brett Caldwell',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(515) 555-0128',
     email: 'b.caldwell@bigiron.com',
@@ -180,7 +183,6 @@ const REPRESENTATIVES = [
     lat: 41.9779,
     lng: -91.6656,
   },
-  // Iowa Classic Car
   {
     id: 57,
     name: 'Pete Hollingsworth',
@@ -195,12 +197,10 @@ const REPRESENTATIVES = [
     lat: 41.5868,
     lng: -93.625,
   },
-
-  // Kansas - 4 reps
   {
     id: 12,
     name: 'Phil Garrett',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(785) 555-0238',
     email: 'p.garrett@bigiron.com',
@@ -253,19 +253,17 @@ const REPRESENTATIVES = [
     lat: 37.9467,
     lng: -100.8696,
   },
-
-  // South Dakota - 3 reps
   {
     id: 16,
     name: 'Janet Krueger',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(605) 555-0381',
     email: 'j.krueger@bigiron.com',
     states: ['SD'],
     counties: ['Minnehaha', 'Lincoln', 'Turner'],
     photo: img('sales7.jpg'),
-    bio: 'Southeast South Dakota farm equipment specialist.',
+    bio: 'Southeast South Dakota farm Equipment Regional Manager.',
     lat: 43.546,
     lng: -96.7313,
   },
@@ -297,19 +295,17 @@ const REPRESENTATIVES = [
     lat: 45.4611,
     lng: -98.4865,
   },
-
-  // Missouri - 3 reps
   {
     id: 19,
     name: 'David Morrison',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(816) 555-0445',
     email: 'd.morrison@bigiron.com',
     states: ['MO'],
     counties: ['Jackson', 'Clay', 'Platte'],
     photo: img('sales1.jpg'),
-    bio: 'Kansas City area equipment specialist with 12 years experience.',
+    bio: 'Kansas City area Equipment Regional Manager with 12 years experience.',
     lat: 39.0997,
     lng: -94.5786,
   },
@@ -341,8 +337,6 @@ const REPRESENTATIVES = [
     lat: 37.209,
     lng: -93.2923,
   },
-
-  // Minnesota - 2 reps
   {
     id: 22,
     name: 'Eric Bergstrom',
@@ -385,19 +379,17 @@ const REPRESENTATIVES = [
     lat: 45.5608,
     lng: -94.1622,
   },
-
-  // North Dakota - 2 reps
   {
     id: 25,
     name: 'Tom Nielsen',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(701) 555-0923',
     email: 't.nielsen@bigiron.com',
     states: ['ND'],
     counties: ['Cass', 'Richland', 'Ransom'],
     photo: img('sales4.jpg'),
-    bio: 'Southeast North Dakota grain equipment specialist.',
+    bio: 'Southeast North Dakota grain Equipment Regional Manager.',
     lat: 46.8772,
     lng: -96.7898,
   },
@@ -415,19 +407,17 @@ const REPRESENTATIVES = [
     lat: 46.8083,
     lng: -100.7837,
   },
-
-  // Wisconsin - 2 reps
   {
     id: 27,
     name: 'Michael Schmidt',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(608) 555-0445',
     email: 'm.schmidt@bigiron.com',
     states: ['WI'],
     counties: ['Dane', 'Columbia', 'Sauk'],
     photo: img('sales5.jpg'),
-    bio: 'South-central Wisconsin dairy equipment specialist.',
+    bio: 'South-central Wisconsin dairy Equipment Regional Manager.',
     lat: 43.0731,
     lng: -89.4012,
   },
@@ -445,12 +435,10 @@ const REPRESENTATIVES = [
     lat: 44.5133,
     lng: -88.0133,
   },
-
-  // Illinois - 3 reps
   {
     id: 29,
     name: 'Brian Carter',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(309) 555-0889',
     email: 'b.carter@bigiron.com',
@@ -489,19 +477,17 @@ const REPRESENTATIVES = [
     lat: 38.5906,
     lng: -90.1994,
   },
-
-  // Indiana - 2 reps
   {
     id: 32,
     name: 'Mark Davis',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(574) 555-0556',
     email: 'm.davis@bigiron.com',
     states: ['IN'],
     counties: ['Elkhart', 'St. Joseph', 'Marshall'],
     photo: img('sales10.jpg'),
-    bio: 'Northern Indiana equipment specialist.',
+    bio: 'Northern Indiana Equipment Regional Manager.',
     lat: 41.6764,
     lng: -85.9767,
   },
@@ -519,12 +505,10 @@ const REPRESENTATIVES = [
     lat: 40.4167,
     lng: -86.8753,
   },
-
-  // Ohio - 2 reps
   {
     id: 34,
     name: 'Steven Martin',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(419) 555-0667',
     email: 's.martin@bigiron.com',
@@ -549,12 +533,10 @@ const REPRESENTATIVES = [
     lat: 40.015,
     lng: -83.0758,
   },
-
-  // Michigan - 2 reps
   {
     id: 36,
     name: 'Robert Wilson',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(989) 555-0778',
     email: 'r.wilson@bigiron.com',
@@ -579,8 +561,6 @@ const REPRESENTATIVES = [
     lat: 42.7325,
     lng: -84.5555,
   },
-
-  // Oklahoma - 3 reps
   {
     id: 38,
     name: 'Chris Anderson',
@@ -623,19 +603,17 @@ const REPRESENTATIVES = [
     lat: 35.4676,
     lng: -97.5164,
   },
-
-  // Texas - 3 reps
   {
     id: 41,
     name: 'John Rodriguez',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(806) 555-0667',
     email: 'j.rodriguez@bigiron.com',
     states: ['TX'],
     counties: ['Lubbock', 'Hale', 'Floyd'],
     photo: img('sales3.jpg'),
-    bio: 'Texas panhandle cotton and grain equipment specialist.',
+    bio: 'Texas panhandle cotton and grain Equipment Regional Manager.',
     lat: 33.5779,
     lng: -101.8552,
   },
@@ -667,19 +645,17 @@ const REPRESENTATIVES = [
     lat: 31.4638,
     lng: -100.437,
   },
-
-  // Arkansas - 2 reps
   {
     id: 44,
     name: 'William Harris',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(870) 555-0889',
     email: 'w.harris@bigiron.com',
     states: ['AR'],
     counties: ['Craighead', 'Poinsett', 'Mississippi'],
     photo: img('sales5.jpg'),
-    bio: 'Northeast Arkansas row crop equipment specialist.',
+    bio: 'Northeast Arkansas row crop Equipment Regional Manager.',
     lat: 35.8423,
     lng: -90.7043,
   },
@@ -697,8 +673,6 @@ const REPRESENTATIVES = [
     lat: 34.7465,
     lng: -92.2896,
   },
-
-  // Louisiana - 1 rep
   {
     id: 46,
     name: 'Joseph Lewis',
@@ -713,24 +687,20 @@ const REPRESENTATIVES = [
     lat: 32.5093,
     lng: -92.1193,
   },
-
-  // Mississippi - 1 rep
   {
     id: 47,
     name: 'Charles King',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(662) 555-0667',
     email: 'c.king@bigiron.com',
     states: ['MS'],
     counties: ['Bolivar', 'Sunflower', 'Washington'],
     photo: img('sales9.jpg'),
-    bio: 'Mississippi Delta cotton equipment specialist.',
+    bio: 'Mississippi Delta cotton Equipment Regional Manager.',
     lat: 33.7073,
     lng: -90.8957,
   },
-
-  // Alabama - 1 rep
   {
     id: 48,
     name: 'Sarah Moore',
@@ -745,24 +715,20 @@ const REPRESENTATIVES = [
     lat: 34.7304,
     lng: -86.5861,
   },
-
-  // Tennessee - 1 rep
   {
     id: 49,
     name: 'Paul Walker',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(731) 555-0445',
     email: 'p.walker@bigiron.com',
     states: ['TN'],
     counties: ['Dyer', 'Gibson', 'Obion'],
     photo: img('sales10.jpg'),
-    bio: 'West Tennessee row crop equipment specialist.',
+    bio: 'West Tennessee row crop Equipment Regional Manager.',
     lat: 36.0345,
     lng: -89.2623,
   },
-
-  // Kentucky - 1 rep
   {
     id: 50,
     name: 'Dorothy Hall',
@@ -777,19 +743,17 @@ const REPRESENTATIVES = [
     lat: 36.8356,
     lng: -87.4886,
   },
-
-  // Colorado - 2 reps
   {
     id: 51,
     name: 'Andrew Young',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(970) 555-0334',
     email: 'a.young@bigiron.com',
     states: ['CO'],
     counties: ['Weld', 'Logan', 'Morgan'],
     photo: img('sales11.jpg'),
-    bio: 'Northeast Colorado dryland and irrigated equipment specialist.',
+    bio: 'Northeast Colorado dryland and irrigated Equipment Regional Manager.',
     lat: 40.4233,
     lng: -104.7091,
   },
@@ -807,8 +771,6 @@ const REPRESENTATIVES = [
     lat: 38.8339,
     lng: -104.8214,
   },
-
-  // Wyoming - 1 rep
   {
     id: 53,
     name: 'George Hernandez',
@@ -823,8 +785,6 @@ const REPRESENTATIVES = [
     lat: 41.3114,
     lng: -105.5911,
   },
-
-  // Montana - 1 rep
   {
     id: 54,
     name: 'Sandra Scott',
@@ -839,19 +799,17 @@ const REPRESENTATIVES = [
     lat: 45.7833,
     lng: -108.5007,
   },
-
-  // Utah - 1 rep
   {
     id: 55,
     name: 'Kevin Green',
-    title: 'Equipment Specialist',
+    title: 'Equipment Regional Manager',
     type: 'Equipment' as RepType,
     phone: '(435) 555-0445',
     email: 'k.green@bigiron.com',
     states: ['UT'],
     counties: ['Cache', 'Box Elder', 'Rich'],
     photo: img('sales2.jpg'),
-    bio: 'Northern Utah irrigated farmland equipment specialist.',
+    bio: 'Northern Utah irrigated farmland Equipment Regional Manager.',
     lat: 41.737,
     lng: -111.8338,
   },
@@ -1028,6 +986,7 @@ const TYPE_CONFIG: Record<
     badge: string
     dot: string
     ring: string
+    icon: string
   }
 > = {
   Equipment: {
@@ -1038,6 +997,7 @@ const TYPE_CONFIG: Record<
       'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-400 dark:border-amber-800',
     dot: 'bg-amber-500',
     ring: 'ring-amber-400',
+    icon: '🚜',
   },
   'Real Estate': {
     accent: 'text-emerald-700 dark:text-emerald-500',
@@ -1047,15 +1007,17 @@ const TYPE_CONFIG: Record<
       'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 dark:border-emerald-800',
     dot: 'bg-emerald-500',
     ring: 'ring-emerald-400',
+    icon: '🏡',
   },
   Livestock: {
     accent: 'text-yellow-900 dark:text-yellow-700',
     bg: 'bg-yellow-900/10 dark:bg-yellow-950/20',
-    border: 'border-yellow-900/20 dark:border-yellow-800',
+    border: 'border-yellow-900/25 dark:border-yellow-800',
     badge:
-      'bg-yellow-900/10 text-yellow-900 border-yellow-900/20 dark:bg-yellow-900/40 dark:text-yellow-400 dark:border-yellow-800',
+      'bg-yellow-900/10 text-yellow-900 border-yellow-900/25 dark:bg-yellow-900/40 dark:text-yellow-400 dark:border-yellow-800',
     dot: 'bg-yellow-900',
     ring: 'ring-yellow-700',
+    icon: '🐄',
   },
   'Classic Car': {
     accent: 'text-blue-600 dark:text-blue-400',
@@ -1065,8 +1027,36 @@ const TYPE_CONFIG: Record<
       'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800',
     dot: 'bg-blue-500',
     ring: 'ring-blue-400',
+    icon: '🚗',
   },
 }
+
+const SELL_CATEGORIES: Array<{
+  value: RepType
+  label: string
+  description: string
+}> = [
+  {
+    value: 'Equipment',
+    label: 'Equipment',
+    description: 'Tractors, combines, tillage & more',
+  },
+  {
+    value: 'Real Estate',
+    label: 'Real Estate',
+    description: 'Farmland, ranches & rural property',
+  },
+  {
+    value: 'Livestock',
+    label: 'Livestock',
+    description: 'Cattle, hogs, sheep & more',
+  },
+  {
+    value: 'Classic Car',
+    label: 'Classic Cars',
+    description: 'Vintage & collector vehicles',
+  },
+]
 
 type Rep = (typeof REPRESENTATIVES)[number]
 type RepWithDistance = Rep & { distance: number }
@@ -1081,11 +1071,10 @@ function calculateDistance(
   const dLat = ((lat2 - lat1) * Math.PI) / 180
   const dLon = ((lon2 - lon1) * Math.PI) / 180
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLat / 2) ** 2 +
     Math.cos((lat1 * Math.PI) / 180) *
       Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2)
+      Math.sin(dLon / 2) ** 2
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
 }
 
@@ -1110,7 +1099,6 @@ function CountyTypeahead({
   const listRef = useRef<HTMLUListElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Sync external value changes (e.g. reset)
   useEffect(() => {
     setInputValue(value)
   }, [value])
@@ -1121,9 +1109,8 @@ function CountyTypeahead({
     return counties.filter((c) => c.toLowerCase().includes(lower))
   }, [inputValue, counties])
 
-  // Close on outside click
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
+    const handleClick = (e: MouseEvent) => {
       if (
         containerRef.current &&
         !containerRef.current.contains(e.target as Node)
@@ -1136,11 +1123,11 @@ function CountyTypeahead({
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  // Scroll active item into view
   useEffect(() => {
     if (activeIndex >= 0 && listRef.current) {
-      const item = listRef.current.children[activeIndex] as HTMLElement
-      item.scrollIntoView({ block: 'nearest' })
+      ;(listRef.current.children[activeIndex] as HTMLElement).scrollIntoView({
+        block: 'nearest',
+      })
     }
   }, [activeIndex])
 
@@ -1151,13 +1138,18 @@ function CountyTypeahead({
     setOpen(true)
     setActiveIndex(-1)
   }
-
-  function handleSelect(countyName: string) {
-    setInputValue(countyName)
-    onChange(countyName)
+  function handleSelect(name: string) {
+    setInputValue(name)
+    onChange(name)
     setOpen(false)
     setActiveIndex(-1)
     inputRef.current?.blur()
+  }
+  function handleClear() {
+    setInputValue('')
+    onChange('')
+    setOpen(false)
+    inputRef.current?.focus()
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -1169,7 +1161,6 @@ function CountyTypeahead({
       }
       return
     }
-
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setActiveIndex((i) => Math.min(i + 1, filtered.length - 1))
@@ -1178,31 +1169,20 @@ function CountyTypeahead({
       setActiveIndex((i) => Math.max(i - 1, 0))
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      if (activeIndex >= 0 && filtered[activeIndex]) {
+      if (activeIndex >= 0 && filtered[activeIndex])
         handleSelect(filtered[activeIndex])
-      } else if (filtered.length === 1) {
-        handleSelect(filtered[0])
-      }
+      else if (filtered.length === 1) handleSelect(filtered[0])
     } else if (e.key === 'Escape') {
       setOpen(false)
       setActiveIndex(-1)
     } else if (e.key === 'Tab') {
-      if (activeIndex >= 0 && filtered[activeIndex]) {
+      if (activeIndex >= 0 && filtered[activeIndex])
         handleSelect(filtered[activeIndex])
-      }
       setOpen(false)
     }
   }
 
-  function handleClear() {
-    setInputValue('')
-    onChange('')
-    setOpen(false)
-    inputRef.current?.focus()
-  }
-
   const showDropdown = open && !disabled && filtered.length > 0
-
   return (
     <div ref={containerRef} className="relative">
       <div className="relative">
@@ -1228,8 +1208,6 @@ function CountyTypeahead({
           }
           className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 pr-8 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         />
-
-        {/* Clear button or chevron */}
         {inputValue && !disabled ? (
           <button
             type="button"
@@ -1268,8 +1246,6 @@ function CountyTypeahead({
           </svg>
         )}
       </div>
-
-      {/* Dropdown */}
       {showDropdown && (
         <ul
           ref={listRef}
@@ -1279,11 +1255,9 @@ function CountyTypeahead({
         >
           {filtered.map((countyName, index) => {
             const isActive = index === activeIndex
-            // Highlight matching portion
             const lower = inputValue.toLowerCase()
             const matchStart = countyName.toLowerCase().indexOf(lower)
             const hasMatch = inputValue.length > 0 && matchStart !== -1
-
             return (
               <li
                 key={countyName}
@@ -1291,16 +1265,11 @@ function CountyTypeahead({
                 role="option"
                 aria-selected={isActive}
                 onMouseDown={(e) => {
-                  // prevent input blur before click registers
                   e.preventDefault()
                   handleSelect(countyName)
                 }}
                 onMouseEnter={() => setActiveIndex(index)}
-                className={`flex items-center px-3 py-1.5 cursor-pointer select-none transition-colors ${
-                  isActive
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-foreground hover:bg-accent/50'
-                }`}
+                className={`flex items-center px-3 py-1.5 cursor-pointer select-none transition-colors ${isActive ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-accent/50'}`}
               >
                 {hasMatch ? (
                   <>
@@ -1321,8 +1290,6 @@ function CountyTypeahead({
           })}
         </ul>
       )}
-
-      {/* No results hint */}
       {open &&
         !disabled &&
         inputValue.trim().length > 0 &&
@@ -1343,10 +1310,10 @@ function SkeletonCard({ type }: { type: RepType }) {
       className={`rounded-lg border ${c.border} ${c.bg} px-4 pt-6 pb-4 flex flex-col items-center h-full`}
     >
       <div
-        className={`w-24 aspect-square rounded-full flex-shrink-0 ring-4 ${c.ring} ring-offset-2 mb-3 max-h-24`}
+        className={`w-20 aspect-square rounded-full flex-shrink-0 ring-4 ${c.ring} ring-offset-2 mb-3`}
         style={{
           background:
-            'linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%)',
+            'linear-gradient(90deg,#e5e7eb 25%,#f3f4f6 50%,#e5e7eb 75%)',
           backgroundSize: '200% 100%',
           animation: 'shimmer 1.5s infinite',
         }}
@@ -1356,7 +1323,7 @@ function SkeletonCard({ type }: { type: RepType }) {
           className="h-4 w-28 rounded"
           style={{
             background:
-              'linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%)',
+              'linear-gradient(90deg,#e5e7eb 25%,#f3f4f6 50%,#e5e7eb 75%)',
             backgroundSize: '200% 100%',
             animation: 'shimmer 1.5s infinite',
           }}
@@ -1365,7 +1332,7 @@ function SkeletonCard({ type }: { type: RepType }) {
           className="h-3 w-20 rounded"
           style={{
             background:
-              'linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%)',
+              'linear-gradient(90deg,#e5e7eb 25%,#f3f4f6 50%,#e5e7eb 75%)',
             backgroundSize: '200% 100%',
             animation: 'shimmer 1.5s infinite 0.1s',
           }}
@@ -1376,31 +1343,8 @@ function SkeletonCard({ type }: { type: RepType }) {
           <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
           {type}
         </span>
-        <div
-          className="h-3 w-24 rounded"
-          style={{
-            background:
-              'linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%)',
-            backgroundSize: '200% 100%',
-            animation: 'shimmer 1.5s infinite 0.2s',
-          }}
-        />
-        <div
-          className="h-3 w-28 rounded"
-          style={{
-            background:
-              'linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%)',
-            backgroundSize: '200% 100%',
-            animation: 'shimmer 1.5s infinite 0.3s',
-          }}
-        />
       </div>
-      <style>{`
-        @keyframes shimmer {
-          0% { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
-      `}</style>
+      <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
     </div>
   )
 }
@@ -1410,85 +1354,500 @@ function RepCard({ rep }: { rep: RepWithDistance | Rep }) {
   const c = TYPE_CONFIG[rep.type]
   return (
     <div
-      className={`rounded-lg border ${c.border} ${c.bg} px-4 pt-6 pb-4 flex flex-col items-center text-center hover:shadow-md transition-shadow duration-150 h-full`}
+      className={`rounded-lg border ${c.border} ${c.bg} px-4 pt-5 pb-4 flex flex-col items-center text-center hover:shadow-md transition-shadow duration-150 h-full`}
     >
       <div
-        className={`w-24 aspect-square rounded-full overflow-hidden bg-muted mb-3 ring-4 ${c.ring} ring-offset-2 flex-shrink-0 max-h-24`}
+        className={`w-20 aspect-square rounded-full overflow-hidden bg-muted mb-3 ring-4 ${c.ring} ring-offset-2 flex-shrink-0`}
       >
         <img
           src={rep.photo}
           alt={`Photo of ${rep.name}`}
           className="w-full h-full object-cover"
           onError={(e) => {
-            const target = e.currentTarget
-            target.style.display = 'none'
-            const parent = target.parentElement
-            if (parent) {
-              parent.classList.add('flex', 'items-center', 'justify-center')
-              const initials = rep.name
+            const t = e.currentTarget
+            t.style.display = 'none'
+            const p = t.parentElement
+            if (p) {
+              p.classList.add('flex', 'items-center', 'justify-center')
+              p.innerHTML = `<span class="text-xl font-bold text-muted-foreground">${rep.name
                 .split(' ')
                 .map((n) => n[0])
-                .join('')
-              parent.innerHTML = `<span class="text-2xl font-bold text-muted-foreground">${initials}</span>`
+                .join('')}</span>`
             }
           }}
         />
       </div>
-
       <div className="mb-2.5">
         <p className="font-semibold text-foreground text-sm leading-tight">
           {rep.name}
         </p>
         <p className="text-xs text-muted-foreground mt-0.5">{rep.title}</p>
       </div>
-
       <span
-        className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${c.badge} whitespace-nowrap mb-3`}
+        className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${c.badge} whitespace-nowrap`}
       >
         <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
         {rep.type}
       </span>
+    </div>
+  )
+}
 
-      <div className="flex flex-col gap-1.5 w-full mt-auto">
-        <a
-          href={`tel:${rep.phone}`}
-          className={`cursor-pointer inline-flex items-center justify-center gap-1.5 text-xs font-medium ${c.accent} hover:underline`}
-        >
+// ─── Classic Car SVG icon ─────────────────────────────────────────────────────
+function ClassicCarIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 64 32"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Body */}
+      <path d="M6 20 C6 20 8 12 16 10 L26 8 C28 8 30 6 34 6 L42 6 C46 6 50 9 52 12 L58 14 C60 15 62 17 62 20 L62 22 C62 23 61 24 60 24 L56 24 C56 27.3 53.3 30 50 30 C46.7 30 44 27.3 44 24 L20 24 C20 27.3 17.3 30 14 30 C10.7 30 8 27.3 8 24 L4 24 C3 24 2 23 2 22 L2 20 Z" />
+      {/* Windshield cutout */}
+      <path d="M28 9 L26 19 L46 19 L44 9 Z" fill="white" opacity="0.3" />
+      {/* Rear window */}
+      <path d="M46 9 L44.5 19 L52 19 L50 11 Z" fill="white" opacity="0.2" />
+      {/* Front wheel */}
+      <circle
+        cx="14"
+        cy="24"
+        r="5"
+        fill="none"
+        stroke="white"
+        strokeWidth="1.5"
+        opacity="0.6"
+      />
+      <circle cx="14" cy="24" r="2" fill="white" opacity="0.4" />
+      {/* Rear wheel */}
+      <circle
+        cx="50"
+        cy="24"
+        r="5"
+        fill="none"
+        stroke="white"
+        strokeWidth="1.5"
+        opacity="0.6"
+      />
+      <circle cx="50" cy="24" r="2" fill="white" opacity="0.4" />
+    </svg>
+  )
+}
+
+// ─── Sell Category Selector ───────────────────────────────────────────────────
+const CATEGORY_ICONS = {
+  Equipment: faTractor,
+  'Real Estate': faSignHanging,
+  Livestock: faCow,
+  'Classic Car': faCarSide,
+} as const
+
+function SellCategorySelector({
+  selected,
+  onChange,
+}: {
+  selected: Array<RepType>
+  onChange: (val: Array<RepType>) => void
+}) {
+  function toggle(val: RepType) {
+    onChange(
+      selected.includes(val)
+        ? selected.filter((v) => v !== val)
+        : [...selected, val],
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {SELL_CATEGORIES.map((cat) => {
+        const isSelected = selected.includes(cat.value)
+        const c = TYPE_CONFIG[cat.value]
+        return (
+          <button
+            key={cat.value}
+            type="button"
+            onClick={() => toggle(cat.value)}
+            className={`cursor-pointer relative flex flex-row items-center gap-3 rounded-lg border-2 p-3 text-left transition-all duration-150 ${
+              isSelected
+                ? `${c.border} ${c.bg} shadow-sm`
+                : 'border-border bg-background hover:border-muted-foreground/30 hover:bg-muted/40'
+            }`}
+          >
+            {/* Checkbox indicator */}
+            <span
+              className={`absolute top-2 right-2 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                isSelected
+                  ? 'border-current opacity-90 bg-current'
+                  : 'border-muted-foreground/30 bg-transparent'
+              }`}
+            >
+              {isSelected && (
+                <svg
+                  className="w-2.5 h-2.5 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={3}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              )}
+            </span>
+
+            {/* FA Icon — left side */}
+            <div className="flex-shrink-0 flex items-center justify-center w-9 h-9">
+              <FontAwesomeIcon
+                icon={CATEGORY_ICONS[cat.value]}
+                className={`text-2xl ${isSelected ? c.accent : 'text-muted-foreground'}`}
+              />
+            </div>
+
+            {/* Text — right side */}
+            <div className="flex flex-col gap-0.5 min-w-0 pr-5">
+              <span
+                className={`text-xs font-semibold leading-tight ${
+                  isSelected ? c.accent : 'text-foreground'
+                }`}
+              >
+                {cat.label}
+              </span>
+              <span className="text-[11px] text-muted-foreground leading-snug">
+                {cat.description}
+              </span>
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Success Panel ────────────────────────────────────────────────────────────
+function SuccessPanel({
+  matchedReps,
+  firstName,
+}: {
+  matchedReps: Array<RepWithDistance>
+  firstName: string
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 dark:bg-slate-900/40 dark:border-slate-700 overflow-hidden">
+      {/* Confirmation header */}
+      <div className="px-5 pt-5 pb-5 flex flex-col items-center text-center gap-2 border-b border-slate-200 dark:border-slate-700">
+        <div className="w-11 h-11 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
           <svg
-            className="w-3.5 h-3.5 flex-shrink-0"
+            className="w-5 h-5 text-green-600 dark:text-green-400"
             fill="none"
             stroke="currentColor"
-            strokeWidth={2}
+            strokeWidth={2.5}
             viewBox="0 0 24 24"
           >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"
+              d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          {rep.phone}
-        </a>
-        <a
-          href={`mailto:${rep.email}`}
-          className={`cursor-pointer inline-flex items-center justify-center gap-1.5 text-xs font-medium ${c.accent} hover:underline`}
-        >
-          <svg
-            className="w-3.5 h-3.5 flex-shrink-0"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
-            />
-          </svg>
-          {rep.email}
-        </a>
+        </div>
+        <div>
+          <p className="font-semibold !mb-2 text-neutral-900 dark:text-green-100">
+            {firstName ? `Thanks, ${firstName}` : "You're all set"} — your{' '}
+            {matchedReps.length === 1 ? 'rep' : 'reps'} will be in touch very
+            shortly.
+          </p>
+          <p className="text-sm text-neutral-700 dark:text-green-300 mt-1 max-w-sm mx-auto leading-relaxed">
+            {matchedReps.length === 1
+              ? `Can't wait? Feel free to give ${matchedReps[0].name} a call directly.`
+              : "Can't wait? Feel free to call any of your local reps directly."}
+          </p>
+        </div>
       </div>
+
+      {/* Rep cards with full color scheme */}
+      <div className="p-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-3">
+        {matchedReps.map((rep) => {
+          const c = TYPE_CONFIG[rep.type]
+          return (
+            <div
+              key={`${rep.id}-${rep.type}`}
+              className={`rounded-lg border ${c.border} ${c.bg} px-3 pt-4 pb-3 flex flex-col items-center text-center gap-2`}
+            >
+              {/* Photo */}
+              <div
+                className={`w-16 aspect-square rounded-full overflow-hidden bg-muted ring-4 ${c.ring} ring-offset-2 flex-shrink-0`}
+              >
+                <img
+                  src={rep.photo}
+                  alt={rep.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const t = e.currentTarget
+                    t.style.display = 'none'
+                    const p = t.parentElement
+                    if (p) {
+                      p.classList.add('flex', 'items-center', 'justify-center')
+                      p.innerHTML = `<span class="text-lg font-bold text-muted-foreground">${rep.name
+                        .split(' ')
+                        .map((n) => n[0])
+                        .join('')}</span>`
+                    }
+                  }}
+                />
+              </div>
+              {/* Name + title */}
+              <div>
+                <p className="font-semibold text-foreground text-xs leading-tight">
+                  {rep.name}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                  {rep.title}
+                </p>
+              </div>
+              {/* Type badge */}
+              <span
+                className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${c.badge} whitespace-nowrap`}
+              >
+                <span className={`w-1 h-1 rounded-full ${c.dot}`} />
+                {rep.type}
+              </span>
+              {/* Call button */}
+              <a
+                href={`tel:${rep.phone.replace(/\D/g, '')}`}
+                className="w-full inline-flex items-center justify-center gap-1.5 h-7 px-2 rounded-md bg-primary hover:bg-primary/90 text-white text-[11px] font-medium transition-colors whitespace-nowrap"
+              >
+                <svg
+                  className="w-2.5 h-2.5 flex-shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 512 512"
+                >
+                  <path d="M164.9 24.6c-7.7-18.6-28-28.5-47.4-23.2l-88 24C12.1 30.2 0 46 0 64C0 311.4 200.6 512 448 512c18 0 33.8-12.1 38.6-29.5l24-88c5.3-19.4-4.6-39.7-23.2-47.4l-96-40c-16.3-6.8-35.2-2.1-46.3 11.6L304.7 368C234.3 334.7 177.3 277.7 144 207.3L193.3 167c13.7-11.2 18.4-30 11.6-46.3l-40-96z" />
+                </svg>
+                {rep.phone}
+              </a>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Contact Form ─────────────────────────────────────────────────────────────
+function ContactForm({
+  reps,
+  onSubmitted,
+}: {
+  reps: Array<RepWithDistance>
+  onSubmitted: (matched: Array<RepWithDistance>, firstName: string) => void
+}) {
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [sellTypes, setSellTypes] = useState<Array<RepType>>([])
+  const [notes, setNotes] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const matchedReps =
+    sellTypes.length > 0 ? reps.filter((r) => sellTypes.includes(r.type)) : reps
+
+  function formatPhone(val: string) {
+    const d = val.replace(/\D/g, '').slice(0, 10)
+    if (d.length <= 3) return d
+    if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`
+    return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (sellTypes.length === 0) return
+    setSubmitting(true)
+    setTimeout(() => {
+      setSubmitting(false)
+      onSubmitted(matchedReps, firstName)
+    }, 1400)
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-5 space-y-5">
+      <div>
+        <h3 className="text-base font-semibold text-foreground">
+          Get in Touch
+        </h3>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Tell us a little about yourself and what you'd like to sell — your
+          local rep will reach out shortly.
+        </p>
+      </div>
+
+      {matchedReps.length > 0 && (
+        <div className="flex items-center gap-2 p-3 rounded-md bg-muted/40 border border-border">
+          <div className="flex -space-x-2 flex-shrink-0">
+            {matchedReps.map((rep) => (
+              <div
+                key={`${rep.id}-${rep.type}`}
+                className="w-7 h-7 rounded-full ring-2 ring-background overflow-hidden bg-muted"
+              >
+                <img
+                  src={rep.photo}
+                  alt={rep.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const t = e.currentTarget
+                    t.style.display = 'none'
+                    const p = t.parentElement
+                    if (p) {
+                      p.classList.add('flex', 'items-center', 'justify-center')
+                      p.innerHTML = `<span class="text-[10px] font-bold text-muted-foreground">${rep.name
+                        .split(' ')
+                        .map((n) => n[0])
+                        .join('')}</span>`
+                    }
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">
+              {matchedReps.length === 1
+                ? matchedReps[0].name
+                : `${matchedReps.length} local reps`}
+            </span>{' '}
+            will receive your request
+          </p>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-foreground">
+              First Name <span className="text-destructive">*</span>
+            </label>
+            <input
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              required
+              placeholder="Jane"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-foreground">
+              Last Name <span className="text-destructive">*</span>
+            </label>
+            <input
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              required
+              placeholder="Smith"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-foreground">
+              Email <span className="text-destructive">*</span>
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="you@example.com"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-foreground">
+              Phone <span className="text-destructive">*</span>
+            </label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(formatPhone(e.target.value))}
+              required
+              placeholder="(555) 000-0000"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-foreground">
+            What would you like to sell?{' '}
+            <span className="text-destructive">*</span>
+          </label>
+          <SellCategorySelector selected={sellTypes} onChange={setSellTypes} />
+          {sellTypes.length === 0 && (
+            <p className="text-[11px] text-muted-foreground">
+              Select at least one category above
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-foreground">
+            Additional details{' '}
+            <span className="text-xs font-normal text-muted-foreground">
+              (optional)
+            </span>
+          </label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            placeholder="Describe what you're selling, timeline, any other details…"
+            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={
+            !firstName ||
+            !lastName ||
+            !email ||
+            !phone ||
+            sellTypes.length === 0 ||
+            submitting
+          }
+          className="cursor-pointer w-full inline-flex items-center justify-center gap-2 h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium shadow hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          {submitting ? (
+            <>
+              <div className="w-3.5 h-3.5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+              Sending…
+            </>
+          ) : (
+            <>
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"
+                />
+              </svg>
+              Send My Info to My Rep{matchedReps.length > 1 ? 's' : ''}
+            </>
+          )}
+        </button>
+      </form>
     </div>
   )
 }
@@ -1498,14 +1857,40 @@ function ResultsPanel({
   loading,
   hasSearched,
   results,
+  onSubmitted,
 }: {
   loading: boolean
   hasSearched: boolean
   results: Array<RepWithDistance>
+  onSubmitted: () => void
 }) {
+  const [submittedReps, setSubmittedReps] =
+    useState<Array<RepWithDistance> | null>(null)
+  const [submittedFirstName, setSubmittedFirstName] = useState('')
+  const contactFormRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setSubmittedReps(null)
+    setSubmittedFirstName('')
+  }, [results])
+
+  function handleSubmitted(matched: Array<RepWithDistance>, firstName: string) {
+    setSubmittedReps(matched)
+    setSubmittedFirstName(firstName)
+    onSubmitted()
+  }
+
+  // Smooth scroll to the contact form section
+  function scrollToForm() {
+    contactFormRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }
+
   if (loading) {
     return (
-      <div className="h-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-3">
         <SkeletonCard type="Equipment" />
         <SkeletonCard type="Livestock" />
         <SkeletonCard type="Real Estate" />
@@ -1516,7 +1901,7 @@ function ResultsPanel({
 
   if (!hasSearched) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-center p-8 rounded-lg border border-dashed border-border bg-muted/30 min-h-[320px]">
+      <div className="h-full flex flex-col items-center justify-center text-center p-8 rounded-lg border border-dashed border-border bg-muted/30 self-stretch">
         <svg
           className="w-12 h-12 text-muted-foreground/40 mb-4"
           fill="none"
@@ -1563,11 +1948,83 @@ function ResultsPanel({
   const sorted = [...results].sort(
     (a, b) => typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type),
   )
+
   return (
-    <div className="h-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-3">
-      {sorted.map((rep) => (
-        <RepCard key={`${rep.id}-${rep.type}`} rep={rep} />
-      ))}
+    <div>
+      {/* Rep cards + intro — fade out after submit */}
+      <div
+        className="transition-all duration-500 ease-in-out"
+        style={
+          submittedReps
+            ? {
+                opacity: 0,
+                maxHeight: 0,
+                overflow: 'hidden',
+                pointerEvents: 'none',
+                marginBottom: 0,
+              }
+            : { opacity: 1, marginBottom: '1.25rem' }
+        }
+      >
+        <div className="space-y-5">
+          <div>
+            <p className="text-md !mb-2 font-medium text-foreground">
+              Meet your local BigIron reps
+            </p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              These specialists serve your area —{' '}
+              {/* ── Scroll-to-form link ── */}
+              <button
+                type="button"
+                onClick={scrollToForm}
+                className="cursor-pointer text-blue-600 dark:text-blue-400 underline underline-offset-2 hover:no-underline font-medium transition-colors"
+              >
+                fill out the form below
+              </button>{' '}
+              to connect.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-3">
+            {sorted.map((rep) => (
+              <RepCard key={`${rep.id}-${rep.type}`} rep={rep} />
+            ))}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="flex-1 border-t border-border" />
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19 13l-7 7-7-7m14-8l-7 7-7-7"
+                />
+              </svg>
+              <span>Ready to connect?</span>
+            </div>
+            <div className="flex-1 border-t border-border" />
+          </div>
+        </div>
+      </div>
+
+      {/* Contact form or success state */}
+      <div ref={contactFormRef}>
+        {submittedReps ? (
+          <SuccessPanel
+            matchedReps={submittedReps}
+            firstName={submittedFirstName}
+          />
+        ) : (
+          <ContactForm reps={results} onSubmitted={handleSubmitted} />
+        )}
+      </div>
     </div>
   )
 }
@@ -1584,16 +2041,15 @@ export default function FindMySalesRepSidebar() {
 
   const results = useMemo<Array<RepWithDistance>>(() => {
     if (!searched || !selectedState || !county.trim()) return []
-
     const stateInfo = US_STATES.find((s) => s.code === selectedState)
     if (!stateInfo) return []
-
     const ct = county.trim().toLowerCase()
 
-    let matchingReps = REPRESENTATIVES.filter((rep) => {
-      if (!rep.states.includes(selectedState)) return false
-      return rep.counties.some((c) => c.toLowerCase() === ct)
-    }).map((rep) => ({
+    let matchingReps = REPRESENTATIVES.filter(
+      (rep) =>
+        rep.states.includes(selectedState) &&
+        rep.counties.some((c) => c.toLowerCase() === ct),
+    ).map((rep) => ({
       ...rep,
       distance: calculateDistance(
         stateInfo.lat,
@@ -1644,21 +2100,21 @@ export default function FindMySalesRepSidebar() {
       }
     }
 
-    const uniqueReps = Array.from(
+    return Array.from(
       new Map(
         matchingReps.map((rep) => [`${rep.id}-${rep.type}`, rep]),
       ).values(),
-    )
-
-    return uniqueReps.sort((a, b) => a.distance - b.distance)
+    ).sort((a, b) => a.distance - b.distance)
   }, [searched, selectedState, county])
 
   const hasSearched = searched && !!selectedState && !!county.trim()
-
-  const availableCounties = useMemo(() => {
-    if (!selectedState) return []
-    return (STATE_COUNTIES[selectedState] || []).slice().sort()
-  }, [selectedState])
+  const availableCounties = useMemo(
+    () =>
+      !selectedState
+        ? []
+        : (STATE_COUNTIES[selectedState] || []).slice().sort(),
+    [selectedState],
+  )
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -1667,14 +2123,15 @@ export default function FindMySalesRepSidebar() {
     setTimeout(() => {
       setLoading(false)
       setSearched(true)
-      if (window.innerWidth < 1024) {
-        setTimeout(() => {
-          resultsRef.current?.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start',
-          })
-        }, 50)
-      }
+      if (window.innerWidth < 1024)
+        setTimeout(
+          () =>
+            resultsRef.current?.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start',
+            }),
+          50,
+        )
     }, 1200)
   }
 
@@ -1688,41 +2145,37 @@ export default function FindMySalesRepSidebar() {
   function handleUseMyLocation() {
     setGettingLocation(true)
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords
-        let closestState = US_STATES[0]
-        let minDistance = calculateDistance(
+      ({ coords: { latitude, longitude } }) => {
+        let closest = US_STATES[0]
+        let minDist = calculateDistance(
           latitude,
           longitude,
-          closestState.lat,
-          closestState.lng,
+          closest.lat,
+          closest.lng,
         )
-        US_STATES.forEach((state) => {
-          const distance = calculateDistance(
-            latitude,
-            longitude,
-            state.lat,
-            state.lng,
-          )
-          if (distance < minDistance) {
-            minDistance = distance
-            closestState = state
+        US_STATES.forEach((s) => {
+          const d = calculateDistance(latitude, longitude, s.lat, s.lng)
+          if (d < minDist) {
+            minDist = d
+            closest = s
           }
         })
-        setSelectedState(closestState.code)
+        setSelectedState(closest.code)
         setCounty('')
         setSearched(false)
         setLoading(false)
         setGettingLocation(false)
-        setTimeout(() => {
-          formRef.current?.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center',
-          })
-        }, 500)
+        setTimeout(
+          () =>
+            formRef.current?.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center',
+            }),
+          500,
+        )
       },
-      (error) => {
-        console.error('Error getting location:', error)
+      (err) => {
+        console.error(err)
         alert(
           'Unable to get your location. Please ensure location permissions are enabled.',
         )
@@ -1733,23 +2186,22 @@ export default function FindMySalesRepSidebar() {
 
   return (
     <div className="flex flex-col gap-6 w-full">
-      {/* Page Header */}
       <div className="px-4 sm:px-6 max-w-[1500px] mx-auto w-full">
         <h1 className="!text-3xl font-semibold tracking-tight text-foreground">
           Find My Sales Rep
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Select your state and county to quickly connect with the BigIron sales
-          representative for Equipment, Real Estate, Livestock, or Classic Cars
-          in your area. With <span className="font-bold">55+ sales reps</span>{' '}
-          serving 24 states, there's a knowledgeable local expert ready to help.
+          Select your state and county to meet the BigIron specialists in your
+          area — then fill out the quick form to get connected. With{' '}
+          <span className="font-bold">
+            sales reps serving all upper 48 states
+          </span>
+          , there's a knowledgeable local expert ready to help you sell.
         </p>
       </div>
 
-      {/* Form (left) + Results (right) */}
       <div className="px-4 sm:px-6 max-w-[1500px] mx-auto w-full">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:items-stretch">
-          {/* Left: Quick Find + Form */}
           <div className="flex flex-col gap-6">
             {/* Quick Find */}
             <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-4">
@@ -1759,15 +2211,9 @@ export default function FindMySalesRepSidebar() {
                     <svg
                       className="w-5 h-5 text-white"
                       fill="currentColor"
-                      stroke="currentColor"
-                      strokeWidth={2}
                       viewBox="0 0 448 512"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M224 248a120 120 0 1 0 0-240 120 120 0 1 0 0 240zm-29.7 56C95.8 304 16 383.8 16 482.3 16 498.7 29.3 512 45.7 512l356.6 0c16.4 0 29.7-13.3 29.7-29.7 0-98.5-79.8-178.3-178.3-178.3l-59.4 0z"
-                      />
+                      <path d="M224 248a120 120 0 1 0 0-240 120 120 0 1 0 0 240zm-29.7 56C95.8 304 16 383.8 16 482.3 16 498.7 29.3 512 45.7 512l356.6 0c16.4 0 29.7-13.3 29.7-29.7 0-98.5-79.8-178.3-178.3-178.3l-59.4 0z" />
                     </svg>
                   </div>
                   <div>
@@ -1784,7 +2230,7 @@ export default function FindMySalesRepSidebar() {
                   type="button"
                   onClick={handleUseMyLocation}
                   disabled={gettingLocation}
-                  className="cursor-pointer inline-flex items-center gap-2 h-9 px-4 rounded-md bg-blue-600 border-blue-200 dark:bg-blue-950/20 text-white dark:text-blue-400 text-sm font-medium shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                  className="cursor-pointer inline-flex items-center gap-2 h-9 px-4 rounded-md bg-blue-600 text-white text-sm font-medium shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
                 >
                   {gettingLocation ? (
                     <>
@@ -1796,15 +2242,9 @@ export default function FindMySalesRepSidebar() {
                       <svg
                         className="w-4 h-4"
                         fill="currentColor"
-                        stroke="currentColor"
-                        strokeWidth={2}
                         viewBox="0 0 576 512"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M288-16c13.3 0 24 10.7 24 24l0 25.3C416.5 44.4 499.6 127.5 510.7 232l25.3 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-25.3 0C499.6 384.5 416.5 467.6 312 478.7l0 25.3c0 13.3-10.7 24-24 24s-24-10.7-24-24l0-25.3C159.5 467.6 76.4 384.5 65.3 280L40 280c-13.3 0-24-10.7-24-24s10.7-24 24-24l25.3 0C76.4 127.5 159.5 44.4 264 33.3L264 8c0-13.3 10.7-24 24-24zM464 256a176 176 0 1 0 -352 0 176 176 0 1 0 352 0zm-112 0a64 64 0 1 0 -128 0 64 64 0 1 0 128 0zm-176 0a112 112 0 1 1 224 0 112 112 0 1 1 -224 0z"
-                        />
+                        <path d="M288-16c13.3 0 24 10.7 24 24l0 25.3C416.5 44.4 499.6 127.5 510.7 232l25.3 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-25.3 0C499.6 384.5 416.5 467.6 312 478.7l0 25.3c0 13.3-10.7 24-24 24s-24-10.7-24-24l0-25.3C159.5 467.6 76.4 384.5 65.3 280L40 280c-13.3 0-24-10.7-24-24s10.7-24 24-24l25.3 0C76.4 127.5 159.5 44.4 264 33.3L264 8c0-13.3 10.7-24 24-24zM464 256a176 176 0 1 0 -352 0 176 176 0 1 0 352 0zm-112 0a64 64 0 1 0 -128 0 64 64 0 1 0 128 0zm-176 0a112 112 0 1 1 224 0 112 112 0 1 1 -224 0z" />
                       </svg>
                       <span>Use Location</span>
                     </>
@@ -1818,8 +2258,8 @@ export default function FindMySalesRepSidebar() {
               <div className="rounded-lg border border-border bg-card p-5 space-y-4">
                 <div className="space-y-3">
                   <div>
-                    <h2 className="text-xl">Best Match</h2>
-                    <p className="text-md text-foreground">
+                    <h2 className="text-lg">Best Match</h2>
+                    <p className="text-sm text-foreground">
                       Enter your{' '}
                       <strong>
                         <u>county</u>
@@ -1828,7 +2268,6 @@ export default function FindMySalesRepSidebar() {
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    {/* State */}
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-medium text-foreground">
                         State <span className="text-destructive">*</span>
@@ -1872,8 +2311,6 @@ export default function FindMySalesRepSidebar() {
                         </svg>
                       </div>
                     </div>
-
-                    {/* County Typeahead */}
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-medium text-foreground">
                         County <span className="text-destructive">*</span>
@@ -1891,7 +2328,6 @@ export default function FindMySalesRepSidebar() {
                     </div>
                   </div>
                 </div>
-
                 <div className="flex gap-2">
                   <button
                     type="submit"
@@ -1931,15 +2367,14 @@ export default function FindMySalesRepSidebar() {
             </form>
           </div>
 
-          {/* Right: Results (2 columns) */}
-          <div ref={resultsRef} className="lg:col-span-2 flex scroll-mt-4">
-            <div className="flex-1">
-              <ResultsPanel
-                loading={loading}
-                hasSearched={hasSearched}
-                results={results}
-              />
-            </div>
+          {/* Right: Results */}
+          <div ref={resultsRef} className="lg:col-span-2 scroll-mt-4">
+            <ResultsPanel
+              loading={loading}
+              hasSearched={hasSearched}
+              results={results}
+              onSubmitted={() => {}}
+            />
           </div>
         </div>
       </div>
