@@ -1664,7 +1664,6 @@ function ContactForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (sellTypes.length === 0) return
     setSubmitting(true)
     setTimeout(() => {
       setSubmitting(false)
@@ -1785,14 +1784,8 @@ function ContactForm({
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-foreground">
             What would you like to sell?{' '}
-            <span className="text-destructive">*</span>
           </label>
           <SellCategorySelector selected={sellTypes} onChange={setSellTypes} />
-          {sellTypes.length === 0 && (
-            <p className="text-[11px] text-muted-foreground">
-              Select at least one category above
-            </p>
-          )}
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -1813,14 +1806,7 @@ function ContactForm({
 
         <button
           type="submit"
-          disabled={
-            !firstName ||
-            !lastName ||
-            !email ||
-            !phone ||
-            sellTypes.length === 0 ||
-            submitting
-          }
+          disabled={!firstName || !lastName || !email || !phone || submitting}
           className="cursor-pointer w-full inline-flex items-center justify-center gap-2 h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium shadow hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
           {submitting ? (
