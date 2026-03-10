@@ -190,7 +190,7 @@ interface Attribute {
   values?: string
   notes?: string
   migration?: string
-  isObsolete?: boolean
+  isInactive?: boolean
 }
 
 interface CategoryDefinition {
@@ -202,7 +202,7 @@ interface CategoryDefinition {
   categoryDisplayOrder: number
   auctionExtension: string
   priority: string
-  isObsolete: boolean
+  isInactive: boolean
   legacyTitle: string
   vertical: string
   effectiveDate: string
@@ -260,7 +260,7 @@ interface CatFormState {
   auctionOrder: string
   auctionExtension: string
   priority: string
-  isObsolete: boolean
+  isInactive: boolean
   legacyTitle: string
   vertical: string
   effectiveDate: string
@@ -640,7 +640,7 @@ const mockAttributes: Array<Attribute> = [
     notInDescription: false,
     appendToDescription: false,
     facet: null,
-    isObsolete: true,
+    isInactive: true,
   },
 ]
 
@@ -711,7 +711,7 @@ const mockChangeLog: Array<ChangeLogEntry> = [
   {
     id: 'cl8',
     categoryId: 'c1',
-    field: 'isObsolete',
+    field: 'isInactive',
     oldValue: 'false',
     newValue: 'true',
     user: 'mrodgers',
@@ -1031,7 +1031,7 @@ function buildCategory(rawTitle: string, idx: number): CategoryDefinition {
     categoryDisplayOrder: (idx + 1) * 10,
     auctionExtension: '3 min',
     priority: idx % 3 === 0 ? 'High' : idx % 3 === 1 ? 'Medium' : 'Low',
-    isObsolete: false,
+    isInactive: false,
     legacyTitle: '',
     vertical,
     effectiveDate: '',
@@ -1063,7 +1063,7 @@ const emptyCategoryForm: CatFormState = {
   auctionOrder: '',
   auctionExtension: '3 min',
   priority: 'Medium',
-  isObsolete: false,
+  isInactive: false,
   legacyTitle: '',
   vertical: '',
   effectiveDate: '',
@@ -1973,8 +1973,8 @@ function CategoryDefinitions() {
     () => ({
       total: cats.length,
       groups: new Set(cats.map((c) => c.heading.level1)).size,
-      active: cats.filter((c) => c.status === 'active' && !c.isObsolete).length,
-      inactive: cats.filter((c) => c.status === 'inactive' || c.isObsolete)
+      active: cats.filter((c) => c.status === 'active' && !c.isInactive).length,
+      inactive: cats.filter((c) => c.status === 'inactive' || c.isInactive)
         .length,
     }),
     [cats],
@@ -1989,8 +1989,8 @@ function CategoryDefinitions() {
         c.industries.industry1.toLowerCase().includes(search.toLowerCase())
       const matchStatus =
         statusFilter === 'active'
-          ? c.status === 'active' && !c.isObsolete
-          : c.status === 'inactive' || c.isObsolete
+          ? c.status === 'active' && !c.isInactive
+          : c.status === 'inactive' || c.isInactive
       const matchIndustry =
         !industryFilter ||
         c.industries.industry1 === industryFilter ||
@@ -2100,7 +2100,7 @@ function CategoryDefinitions() {
     setCats((prev) =>
       prev.map((c) =>
         c.id === toggleConfirm.cat.id
-          ? { ...c, status: toggleConfirm.newStatus, isObsolete: false }
+          ? { ...c, status: toggleConfirm.newStatus, isInactive: false }
           : c,
       ),
     )
@@ -2765,7 +2765,7 @@ function CategoryDefinitions() {
               <Trash2 className="h-5 w-5 text-destructive" />
             </div>
             <div>
-              <p className="text-sm font-medium mb-1">
+              <p className="text-sm font-medium !mb-0">
                 Are you sure you want to delete "{deletingCat?.name}"?
               </p>
               <p className="text-sm text-muted-foreground">
@@ -2947,7 +2947,7 @@ function CategoryDefinitions() {
                           <span className="font-medium text-sm">
                             {attr.name}
                           </span>
-                          {attr.isObsolete && (
+                          {attr.isInactive && (
                             <span className="ml-2 text-xs text-muted-foreground italic">
                               (obsolete)
                             </span>
@@ -3212,7 +3212,7 @@ function CategoryDefinitions() {
                           <span className="font-medium text-sm">
                             {attr.name}
                           </span>
-                          {attr.isObsolete && (
+                          {attr.isInactive && (
                             <span className="ml-2 text-xs text-muted-foreground italic">
                               (obsolete)
                             </span>
