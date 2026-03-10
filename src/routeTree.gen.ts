@@ -20,11 +20,13 @@ import { Route as IpBanManagementRouteImport } from './routes/ip-ban-management'
 import { Route as ImageryRouteImport } from './routes/imagery'
 import { Route as IdentityRouteImport } from './routes/identity'
 import { Route as FormsRouteImport } from './routes/forms'
+import { Route as FindARepPreviousRouteImport } from './routes/find-a-rep-previous'
 import { Route as FindARepRouteImport } from './routes/find-a-rep'
 import { Route as FigmaRouteImport } from './routes/figma'
 import { Route as ElementsRouteImport } from './routes/elements'
 import { Route as DashboardsOldRouteImport } from './routes/dashboards-old'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CategoryDefinitionsRouteImport } from './routes/category-definitions'
 import { Route as IndexRouteImport } from './routes/index'
 
 const VoiceAndToneRoute = VoiceAndToneRouteImport.update({
@@ -82,6 +84,11 @@ const FormsRoute = FormsRouteImport.update({
   path: '/forms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FindARepPreviousRoute = FindARepPreviousRouteImport.update({
+  id: '/find-a-rep-previous',
+  path: '/find-a-rep-previous',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FindARepRoute = FindARepRouteImport.update({
   id: '/find-a-rep',
   path: '/find-a-rep',
@@ -107,6 +114,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CategoryDefinitionsRoute = CategoryDefinitionsRouteImport.update({
+  id: '/category-definitions',
+  path: '/category-definitions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -115,11 +127,13 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/category-definitions': typeof CategoryDefinitionsRoute
   '/dashboard': typeof DashboardRoute
   '/dashboards-old': typeof DashboardsOldRoute
   '/elements': typeof ElementsRoute
   '/figma': typeof FigmaRoute
   '/find-a-rep': typeof FindARepRoute
+  '/find-a-rep-previous': typeof FindARepPreviousRoute
   '/forms': typeof FormsRoute
   '/identity': typeof IdentityRoute
   '/imagery': typeof ImageryRoute
@@ -134,11 +148,13 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/category-definitions': typeof CategoryDefinitionsRoute
   '/dashboard': typeof DashboardRoute
   '/dashboards-old': typeof DashboardsOldRoute
   '/elements': typeof ElementsRoute
   '/figma': typeof FigmaRoute
   '/find-a-rep': typeof FindARepRoute
+  '/find-a-rep-previous': typeof FindARepPreviousRoute
   '/forms': typeof FormsRoute
   '/identity': typeof IdentityRoute
   '/imagery': typeof ImageryRoute
@@ -154,11 +170,13 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/category-definitions': typeof CategoryDefinitionsRoute
   '/dashboard': typeof DashboardRoute
   '/dashboards-old': typeof DashboardsOldRoute
   '/elements': typeof ElementsRoute
   '/figma': typeof FigmaRoute
   '/find-a-rep': typeof FindARepRoute
+  '/find-a-rep-previous': typeof FindARepPreviousRoute
   '/forms': typeof FormsRoute
   '/identity': typeof IdentityRoute
   '/imagery': typeof ImageryRoute
@@ -175,11 +193,13 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/category-definitions'
     | '/dashboard'
     | '/dashboards-old'
     | '/elements'
     | '/figma'
     | '/find-a-rep'
+    | '/find-a-rep-previous'
     | '/forms'
     | '/identity'
     | '/imagery'
@@ -194,11 +214,13 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/category-definitions'
     | '/dashboard'
     | '/dashboards-old'
     | '/elements'
     | '/figma'
     | '/find-a-rep'
+    | '/find-a-rep-previous'
     | '/forms'
     | '/identity'
     | '/imagery'
@@ -213,11 +235,13 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/category-definitions'
     | '/dashboard'
     | '/dashboards-old'
     | '/elements'
     | '/figma'
     | '/find-a-rep'
+    | '/find-a-rep-previous'
     | '/forms'
     | '/identity'
     | '/imagery'
@@ -233,11 +257,13 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CategoryDefinitionsRoute: typeof CategoryDefinitionsRoute
   DashboardRoute: typeof DashboardRoute
   DashboardsOldRoute: typeof DashboardsOldRoute
   ElementsRoute: typeof ElementsRoute
   FigmaRoute: typeof FigmaRoute
   FindARepRoute: typeof FindARepRoute
+  FindARepPreviousRoute: typeof FindARepPreviousRoute
   FormsRoute: typeof FormsRoute
   IdentityRoute: typeof IdentityRoute
   ImageryRoute: typeof ImageryRoute
@@ -330,6 +356,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FormsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/find-a-rep-previous': {
+      id: '/find-a-rep-previous'
+      path: '/find-a-rep-previous'
+      fullPath: '/find-a-rep-previous'
+      preLoaderRoute: typeof FindARepPreviousRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/find-a-rep': {
       id: '/find-a-rep'
       path: '/find-a-rep'
@@ -365,6 +398,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/category-definitions': {
+      id: '/category-definitions'
+      path: '/category-definitions'
+      fullPath: '/category-definitions'
+      preLoaderRoute: typeof CategoryDefinitionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -377,11 +417,13 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CategoryDefinitionsRoute: CategoryDefinitionsRoute,
   DashboardRoute: DashboardRoute,
   DashboardsOldRoute: DashboardsOldRoute,
   ElementsRoute: ElementsRoute,
   FigmaRoute: FigmaRoute,
   FindARepRoute: FindARepRoute,
+  FindARepPreviousRoute: FindARepPreviousRoute,
   FormsRoute: FormsRoute,
   IdentityRoute: IdentityRoute,
   ImageryRoute: ImageryRoute,

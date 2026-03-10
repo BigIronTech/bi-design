@@ -79,6 +79,11 @@ const navItems = [
       { id: 'auction-insights', label: 'Auction Cockpit', to: '/dashboard' },
       { id: 'market-report', label: 'Market Report', to: '/market-reports' },
       { id: 'ip-ban', label: 'IP Ban Management', to: '/ip-ban-management' },
+      {
+        id: 'category-definitions',
+        label: 'Category Definitions',
+        to: '/category-definitions',
+      },
       { id: 'find-a-rep', label: 'Find My Sales Rep', to: '/find-a-rep' }, // ← NEW
     ],
   },
