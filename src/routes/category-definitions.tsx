@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   ArrowUpDown,
@@ -190,7 +190,7 @@ interface Attribute {
   values?: string
   notes?: string
   migration?: string
-  isInactive?: boolean
+  isObsolete?: boolean
 }
 
 interface CategoryDefinition {
@@ -202,7 +202,7 @@ interface CategoryDefinition {
   categoryDisplayOrder: number
   auctionExtension: string
   priority: string
-  isInactive: boolean
+  isObsolete: boolean
   legacyTitle: string
   vertical: string
   effectiveDate: string
@@ -260,7 +260,7 @@ interface CatFormState {
   auctionOrder: string
   auctionExtension: string
   priority: string
-  isInactive: boolean
+  isObsolete: boolean
   legacyTitle: string
   vertical: string
   effectiveDate: string
@@ -640,7 +640,7 @@ const mockAttributes: Array<Attribute> = [
     notInDescription: false,
     appendToDescription: false,
     facet: null,
-    isInactive: true,
+    isObsolete: true,
   },
 ]
 
@@ -711,7 +711,7 @@ const mockChangeLog: Array<ChangeLogEntry> = [
   {
     id: 'cl8',
     categoryId: 'c1',
-    field: 'isInactive',
+    field: 'isObsolete',
     oldValue: 'false',
     newValue: 'true',
     user: 'mrodgers',
@@ -1031,7 +1031,7 @@ function buildCategory(rawTitle: string, idx: number): CategoryDefinition {
     categoryDisplayOrder: (idx + 1) * 10,
     auctionExtension: '3 min',
     priority: idx % 3 === 0 ? 'High' : idx % 3 === 1 ? 'Medium' : 'Low',
-    isInactive: false,
+    isObsolete: false,
     legacyTitle: '',
     vertical,
     effectiveDate: '',
@@ -1063,7 +1063,7 @@ const emptyCategoryForm: CatFormState = {
   auctionOrder: '',
   auctionExtension: '3 min',
   priority: 'Medium',
-  isInactive: false,
+  isObsolete: false,
   legacyTitle: '',
   vertical: '',
   effectiveDate: '',
@@ -1109,6 +1109,45 @@ const emptyAttrForm: AttrFormState = {
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
+
+function AnimateExpand({
+  open,
+  children,
+}: {
+  open: boolean
+  children: React.ReactNode
+}) {
+  const ref = React.useRef<HTMLDivElement>(null)
+  const [height, setHeight] = React.useState(0)
+  const [visible, setVisible] = React.useState(open)
+
+  React.useEffect(() => {
+    if (open) {
+      setVisible(true)
+      requestAnimationFrame(() => {
+        if (ref.current) setHeight(ref.current.scrollHeight)
+      })
+    } else {
+      setHeight(0)
+      const t = setTimeout(() => setVisible(false), 280)
+      return () => clearTimeout(t)
+    }
+  }, [open])
+
+  if (!visible && !open) return null
+
+  return (
+    <div
+      style={{
+        maxHeight: height,
+        overflow: 'hidden',
+        transition: 'max-height 280ms ease-in-out',
+      }}
+    >
+      <div ref={ref}>{children}</div>
+    </div>
+  )
+}
 
 function SectionHeader({
   title,
@@ -1208,7 +1247,6 @@ function CategoryTypeahead({
           setOpen(true)
           setActiveIdx(-1)
         }}
-        onFocus={() => setOpen(true)}
         onBlur={() =>
           setTimeout(() => {
             setOpen(false)
@@ -1620,7 +1658,6 @@ function AttributeForm({
 
   return (
     <div className="space-y-4">
-      {/* Name / Title / Editor / Display Order */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label>
@@ -1663,7 +1700,6 @@ function AttributeForm({
         </div>
       </div>
 
-      {/* Flags */}
       <div className="p-3 bg-muted/50 rounded-lg border">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
           Flags
@@ -1684,7 +1720,6 @@ function AttributeForm({
         </div>
       </div>
 
-      {/* Facet / Prefix / Value / Suffix / Units / Units Separator */}
       <div className="grid grid-cols-2 gap-4">
         <SelectField
           label="Facet"
@@ -1702,7 +1737,7 @@ function AttributeForm({
                 : k.charAt(0).toUpperCase() + k.slice(1)}
             </Label>
             <input
-              value={form[k]}
+              value={form[k] as string}
               onChange={(e) => f(k, e.target.value)}
               className={inputCls}
             />
@@ -1710,7 +1745,6 @@ function AttributeForm({
         ))}
       </div>
 
-      {/* Yes / No section */}
       <div className="p-3 bg-muted/50 rounded-lg border space-y-3">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           Yes / No
@@ -1774,7 +1808,6 @@ function AttributeForm({
         </div>
       </div>
 
-      {/* Suppress / Values / Notes */}
       <div className="grid grid-cols-2 gap-2">
         <div className="flex items-center gap-2">
           <Checkbox
@@ -1824,7 +1857,6 @@ function AttributeForm({
         />
       </div>
 
-      {/* Migration */}
       <SelectField
         label="Migration"
         value={form.migration || 'None'}
@@ -1928,6 +1960,9 @@ function CategoryDefinitions() {
     }
   }, [])
 
+  const catTableRef = useRef<HTMLDivElement>(null)
+  const attrTableRef = useRef<HTMLDivElement>(null)
+  const allAttrTableRef = useRef<HTMLDivElement>(null)
   const [cats, setCats] = useState<Array<CategoryDefinition>>(categories)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive'>(
@@ -1937,6 +1972,10 @@ function CategoryDefinitions() {
   const [groupFilter, setGroupFilter] = useState('')
   const [sortCol, setSortCol] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [attrSortCol, setAttrSortCol] = useState<
+    'name' | 'displayOrder' | null
+  >(null)
+  const [attrSortDir, setAttrSortDir] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 20
 
@@ -1947,6 +1986,7 @@ function CategoryDefinitions() {
   const [deletingCat, setDeletingCat] = useState<CategoryDefinition | null>(
     null,
   )
+  const [deletingAttr, setDeletingAttr] = useState<Attribute | null>(null)
   const [attrsCat, setAttrsCat] = useState<CategoryDefinition | null>(null)
   const [attrs, setAttrs] = useState<Array<Attribute>>(mockAttributes)
   const [editingAttr, setEditingAttr] = useState<
@@ -1973,8 +2013,8 @@ function CategoryDefinitions() {
     () => ({
       total: cats.length,
       groups: new Set(cats.map((c) => c.heading.level1)).size,
-      active: cats.filter((c) => c.status === 'active' && !c.isInactive).length,
-      inactive: cats.filter((c) => c.status === 'inactive' || c.isInactive)
+      active: cats.filter((c) => c.status === 'active' && !c.isObsolete).length,
+      inactive: cats.filter((c) => c.status === 'inactive' || c.isObsolete)
         .length,
     }),
     [cats],
@@ -1989,8 +2029,8 @@ function CategoryDefinitions() {
         c.industries.industry1.toLowerCase().includes(search.toLowerCase())
       const matchStatus =
         statusFilter === 'active'
-          ? c.status === 'active' && !c.isInactive
-          : c.status === 'inactive' || c.isInactive
+          ? c.status === 'active' && !c.isObsolete
+          : c.status === 'inactive' || c.isObsolete
       const matchIndustry =
         !industryFilter ||
         c.industries.industry1 === industryFilter ||
@@ -2053,6 +2093,26 @@ function CategoryDefinitions() {
     }
   }
 
+  const handleAttrSort = (col: 'name' | 'displayOrder') => {
+    if (attrSortCol === col)
+      setAttrSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else {
+      setAttrSortCol(col)
+      setAttrSortDir('asc')
+    }
+  }
+
+  const sortedAttrs = useMemo(() => {
+    if (!attrSortCol) return attrs
+    return [...attrs].sort((a, b) => {
+      const av = attrSortCol === 'name' ? a.name.toLowerCase() : a.displayOrder
+      const bv = attrSortCol === 'name' ? b.name.toLowerCase() : b.displayOrder
+      if (av < bv) return attrSortDir === 'asc' ? -1 : 1
+      if (av > bv) return attrSortDir === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [attrs, attrSortCol, attrSortDir])
+
   const handleCreateCategory = () => {
     if (!catForm.name || !catForm.title) {
       alert('Name and Title are required')
@@ -2100,7 +2160,7 @@ function CategoryDefinitions() {
     setCats((prev) =>
       prev.map((c) =>
         c.id === toggleConfirm.cat.id
-          ? { ...c, status: toggleConfirm.newStatus, isInactive: false }
+          ? { ...c, status: toggleConfirm.newStatus, isObsolete: false }
           : c,
       ),
     )
@@ -2184,12 +2244,36 @@ function CategoryDefinitions() {
     </TableHead>
   )
 
+  const AttrSortHead = ({
+    col,
+    label,
+  }: {
+    col: 'name' | 'displayOrder'
+    label: string
+  }) => (
+    <TableHead>
+      <button
+        onClick={() => handleAttrSort(col)}
+        className="flex items-center gap-1 hover:text-foreground transition-colors font-medium"
+      >
+        {label}
+        <ArrowUpDown
+          className={cn(
+            'h-4 w-4',
+            attrSortCol === col ? 'text-foreground' : 'text-muted-foreground',
+          )}
+        />
+      </button>
+    </TableHead>
+  )
+
   return (
     <SidebarProvider>
       <AppSidebar />
       <DashboardWrapper>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-sidebar">
-          <h1 className="text-lg font-semibold md:text-2xl">
+          {/* ── CHANGE 1: Smaller heading on mobile ── */}
+          <h1 className="text-base font-semibold sm:text-xl md:text-2xl">
             Category Definitions
           </h1>
 
@@ -2222,18 +2306,58 @@ function CategoryDefinitions() {
           {/* Main table card */}
           <Card>
             <CardHeader>
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <CardTitle>Category Records</CardTitle>
-                  <CardDescription>
-                    Manage category definitions, attributes, and display
-                    settings
-                  </CardDescription>
+              {/* ── CHANGE 2: Responsive button layout ──
+                  Mobile:  Title + description
+                           Change Log | All Attributes  (full-width row)
+                           Add Subcategory              (full-width row)
+                  Desktop: Title + description  |  [Change Log] [All Attributes] [Add Subcategory]
+              */}
+              <div className="flex flex-col gap-3">
+                {/* Row 1: title + desktop buttons */}
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle>Category Records</CardTitle>
+                    <CardDescription>
+                      Manage category definitions, attributes, and display
+                      settings
+                    </CardDescription>
+                  </div>
+                  {/* Desktop: all three buttons in a row */}
+                  <div className="hidden sm:flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setChangeLogCat({ id: null, name: 'All' })}
+                    >
+                      <Clock className="h-4 w-4 mr-2" />
+                      Change Log
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAllAttrs(true)}
+                    >
+                      <Database className="h-4 w-4 mr-2" />
+                      All Attributes
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setCatForm(emptyCategoryForm)
+                        setShowCreate(true)
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Subcategory
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
+                {/* Mobile: Change Log + All Attributes */}
+                <div className="flex items-center gap-2 sm:hidden">
                   <Button
                     variant="outline"
                     size="sm"
+                    className="flex-1"
                     onClick={() => setChangeLogCat({ id: null, name: 'All' })}
                   >
                     <Clock className="h-4 w-4 mr-2" />
@@ -2242,13 +2366,18 @@ function CategoryDefinitions() {
                   <Button
                     variant="outline"
                     size="sm"
+                    className="flex-1"
                     onClick={() => setShowAllAttrs(true)}
                   >
                     <Database className="h-4 w-4 mr-2" />
                     All Attributes
                   </Button>
+                </div>
+                {/* Mobile: Add Subcategory */}
+                <div className="sm:hidden">
                   <Button
                     size="sm"
+                    className="w-full"
                     onClick={() => {
                       setCatForm(emptyCategoryForm)
                       setShowCreate(true)
@@ -2269,7 +2398,7 @@ function CategoryDefinitions() {
                 }}
               >
                 <div className="flex flex-col gap-4">
-                  {/* Search */}
+                  {/* Search + Filters */}
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <div className="relative flex-1 max-w-sm">
@@ -2306,76 +2435,85 @@ function CategoryDefinitions() {
                       </Button>
                     </div>
 
-                    {showFilters && (
-                      <div className="flex items-end gap-3 p-3 bg-muted/40 rounded-lg border">
-                        <div className="space-y-1">
-                          <label className="text-xs font-medium text-muted-foreground">
-                            Industry
-                          </label>
-                          <Select
-                            value={industryFilter}
-                            onValueChange={(v) => {
-                              setIndustryFilter(v === '_all' ? '' : v)
+                    {/* ── CHANGE 3: Animated filter panel using CSS grid trick ── */}
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateRows: showFilters ? '1fr' : '0fr',
+                        transition: 'grid-template-rows 250ms ease-in-out',
+                      }}
+                    >
+                      <div style={{ overflow: 'hidden' }}>
+                        <div className="flex flex-wrap items-end gap-3 p-3 bg-muted/40 rounded-lg border mt-1">
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-muted-foreground">
+                              Industry
+                            </label>
+                            <Select
+                              value={industryFilter}
+                              onValueChange={(v) => {
+                                setIndustryFilter(v === '_all' ? '' : v)
+                                setPage(1)
+                              }}
+                            >
+                              <SelectTrigger className="w-40 h-8 text-xs">
+                                <SelectValue placeholder="All Industries" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="_all">
+                                  All Industries
+                                </SelectItem>
+                                {INDUSTRIES.map((v) => (
+                                  <SelectItem key={v} value={v}>
+                                    {v}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-muted-foreground">
+                              Category
+                            </label>
+                            <Select
+                              value={groupFilter}
+                              onValueChange={(v) => {
+                                setGroupFilter(v === '_all' ? '' : v)
+                                setPage(1)
+                              }}
+                            >
+                              <SelectTrigger className="w-56 h-8 text-xs">
+                                <SelectValue placeholder="All Categories" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="_all">
+                                  All Categories
+                                </SelectItem>
+                                {uniqueGroups.map((v) => (
+                                  <SelectItem key={v} value={v}>
+                                    {v}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSearch('')
+                              setIndustryFilter('')
+                              setGroupFilter('')
+                              setStatusFilter('active')
                               setPage(1)
                             }}
                           >
-                            <SelectTrigger className="w-40 h-8 text-xs">
-                              <SelectValue placeholder="All Industries" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="_all">
-                                All Industries
-                              </SelectItem>
-                              {INDUSTRIES.map((v) => (
-                                <SelectItem key={v} value={v}>
-                                  {v}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            <RefreshCw className="h-4 w-4 mr-1" />
+                            Reset
+                          </Button>
                         </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-medium text-muted-foreground">
-                            Category
-                          </label>
-                          <Select
-                            value={groupFilter}
-                            onValueChange={(v) => {
-                              setGroupFilter(v === '_all' ? '' : v)
-                              setPage(1)
-                            }}
-                          >
-                            <SelectTrigger className="w-56 h-8 text-xs">
-                              <SelectValue placeholder="All Categories" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="_all">
-                                All Categories
-                              </SelectItem>
-                              {uniqueGroups.map((v) => (
-                                <SelectItem key={v} value={v}>
-                                  {v}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSearch('')
-                            setIndustryFilter('')
-                            setGroupFilter('')
-                            setStatusFilter('active')
-                            setPage(1)
-                          }}
-                        >
-                          <RefreshCw className="h-4 w-4 mr-1" />
-                          Reset
-                        </Button>
                       </div>
-                    )}
+                    </div>
 
                     {/* Active filter badges */}
                     {(search || industryFilter || groupFilter) && (
@@ -2456,7 +2594,10 @@ function CategoryDefinitions() {
                 </div>
 
                 <TabsContent value={statusFilter} className="mt-0">
-                  <div className="rounded-md border">
+                  <div
+                    ref={catTableRef}
+                    className="rounded-md border overflow-x-auto"
+                  >
                     <Table>
                       <TableHeader className="bg-muted">
                         <TableRow>
@@ -2466,7 +2607,9 @@ function CategoryDefinitions() {
                           <SortHead col="priority" label="Priority" />
                           <SortHead col="order" label="Order" />
                           <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
+                          <TableHead className="sticky right-0 bg-muted text-right whitespace-nowrap w-px after:absolute after:inset-y-0 after:left-0 after:w-px after:bg-border">
+                            Actions
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -2524,8 +2667,8 @@ function CategoryDefinitions() {
                                 {cat.auctionOrder}
                               </TableCell>
                               <TableCell>
-                                <TooltipProvider>
-                                  <Tooltip>
+                                <TooltipProvider delayDuration={600}>
+                                  <Tooltip delayDuration={700}>
                                     <TooltipTrigger asChild>
                                       <button
                                         onClick={() =>
@@ -2569,10 +2712,10 @@ function CategoryDefinitions() {
                                   </Tooltip>
                                 </TooltipProvider>
                               </TableCell>
-                              <TableCell className="text-right">
+                              <TableCell className="sticky right-0 bg-background text-right whitespace-nowrap w-px after:absolute after:inset-y-0 after:left-0 after:w-px after:bg-border">
                                 <div className="flex items-center justify-end gap-1">
-                                  <TooltipProvider>
-                                    <Tooltip>
+                                  <TooltipProvider delayDuration={600}>
+                                    <Tooltip delayDuration={700}>
                                       <TooltipTrigger asChild>
                                         <Button
                                           variant="ghost"
@@ -2587,7 +2730,7 @@ function CategoryDefinitions() {
                                         Edit Subcategory
                                       </TooltipContent>
                                     </Tooltip>
-                                    <Tooltip>
+                                    <Tooltip delayDuration={700}>
                                       <TooltipTrigger asChild>
                                         <Button
                                           variant="ghost"
@@ -2602,7 +2745,7 @@ function CategoryDefinitions() {
                                         Manage Attributes
                                       </TooltipContent>
                                     </Tooltip>
-                                    <Tooltip>
+                                    <Tooltip delayDuration={700}>
                                       <TooltipTrigger asChild>
                                         <Button
                                           variant="ghost"
@@ -2617,7 +2760,7 @@ function CategoryDefinitions() {
                                         View Change Log
                                       </TooltipContent>
                                     </Tooltip>
-                                    <Tooltip>
+                                    <Tooltip delayDuration={700}>
                                       <TooltipTrigger asChild>
                                         <Button
                                           variant="ghost"
@@ -2701,54 +2844,64 @@ function CategoryDefinitions() {
         </main>
       </DashboardWrapper>
 
-      {/* ── Create/Edit Category Dialog ── */}
-      {[
-        {
-          open: showCreate,
-          onClose: () => setShowCreate(false),
-          title: 'Add Subcategory',
-          guid: null,
-          desc: 'Create a new subcategory definition',
-          onSave: handleCreateCategory,
-          saveLabel: 'Create Subcategory',
-        },
-        {
-          open: !!editingCat,
-          onClose: () => setEditingCat(null),
-          title: `Edit — ${editingCat?.name}`,
-          guid: editingCat?.guid ?? null,
-          desc: 'Update subcategory definition details',
-          onSave: handleSaveEdit,
-          saveLabel: 'Save Changes',
-        },
-      ].map(({ open, onClose, title, guid, desc, onSave, saveLabel }) => (
-        <Dialog key={title} open={open} onOpenChange={(o) => !o && onClose()}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{title}</DialogTitle>
-              {guid && (
-                <div className="flex items-center gap-2 pt-1">
-                  <span className="inline-flex items-center font-mono text-[11px] bg-gray-900 text-gray-100 rounded px-2 py-0.5 tracking-wide select-all">
-                    {guid}
-                  </span>
-                </div>
-              )}
-              <DialogDescription>{desc}</DialogDescription>
-            </DialogHeader>
-            <CategoryForm
-              form={catForm}
-              setForm={setCatForm}
-              allCategoryGroups={uniqueGroups}
-            />
-            <DialogFooter>
-              <Button variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button onClick={onSave}>{saveLabel}</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      ))}
+      {/* ── Create Category Dialog ── */}
+      <Dialog
+        open={showCreate}
+        onOpenChange={(o) => !o && setShowCreate(false)}
+      >
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Subcategory</DialogTitle>
+            <DialogDescription>
+              Create a new subcategory definition
+            </DialogDescription>
+          </DialogHeader>
+          <CategoryForm
+            form={catForm}
+            setForm={setCatForm}
+            allCategoryGroups={uniqueGroups}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateCategory}>Create Subcategory</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Category Dialog ── */}
+      <Dialog
+        open={!!editingCat}
+        onOpenChange={(o) => !o && setEditingCat(null)}
+      >
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit — {editingCat?.name}</DialogTitle>
+            {editingCat?.guid && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="inline-flex items-center font-mono text-[11px] bg-gray-900 text-gray-100 rounded px-2 py-0.5 tracking-wide select-all">
+                  {editingCat.guid}
+                </span>
+              </div>
+            )}
+            <DialogDescription>
+              Update subcategory definition details
+            </DialogDescription>
+          </DialogHeader>
+          <CategoryForm
+            form={catForm}
+            setForm={setCatForm}
+            allCategoryGroups={uniqueGroups}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingCat(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Delete Confirm ── */}
       <Dialog
@@ -2761,7 +2914,7 @@ function CategoryDefinitions() {
             <DialogDescription>This action cannot be undone.</DialogDescription>
           </DialogHeader>
           <div className="flex gap-4 py-2">
-            <div className="p-3 bg-destructive/10 rounded-xl shrink-0">
+            <div className="p-3 bg-destructive/10 rounded-xl shrink-0 self-start">
               <Trash2 className="h-5 w-5 text-destructive" />
             </div>
             <div>
@@ -2779,6 +2932,46 @@ function CategoryDefinitions() {
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
               Delete Category
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Attribute Confirm ── */}
+      <Dialog
+        open={!!deletingAttr}
+        onOpenChange={(o) => !o && setDeletingAttr(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Attribute</DialogTitle>
+            <DialogDescription>This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-4 py-2">
+            <div className="p-3 bg-destructive/10 rounded-xl shrink-0 self-start">
+              <Trash2 className="h-5 w-5 text-destructive" />
+            </div>
+            <div>
+              <p className="text-sm font-medium !mb-0">
+                Are you sure you want to delete "{deletingAttr?.name}"?
+              </p>
+              <p className="text-sm text-muted-foreground">
+                This attribute will be removed from all categories.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingAttr(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setAttrs((a) => a.filter((x) => x.id !== deletingAttr?.id))
+                setDeletingAttr(null)
+              }}
+            >
+              Delete Attribute
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2859,7 +3052,7 @@ function CategoryDefinitions() {
           }
         }}
       >
-        <DialogContent className="!max-w-5xl h-[85vh] flex flex-col p-0 gap-0">
+        <DialogContent className="!max-w-5xl max-h-[85vh] flex flex-col p-0 gap-0">
           <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
             <DialogTitle>Attributes — {attrsCat?.name}</DialogTitle>
             <DialogDescription>
@@ -2884,7 +3077,6 @@ function CategoryDefinitions() {
               </Button>
             </div>
 
-            {/* New attribute form */}
             {editingAttr?.id === 'new' && (
               <div className="border border-amber-200 dark:border-amber-700/50 rounded-lg bg-amber-50/60 dark:bg-amber-900/10 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-amber-200 dark:border-amber-700/50">
@@ -2920,19 +3112,24 @@ function CategoryDefinitions() {
               </div>
             )}
 
-            <div className="rounded-md border">
+            <div
+              ref={attrTableRef}
+              className="rounded-md border overflow-x-auto"
+            >
               <Table>
                 <TableHeader className="bg-muted sticky top-0 z-10">
                   <TableRow>
-                    <TableHead>Name</TableHead>
+                    <AttrSortHead col="name" label="Name" />
                     <TableHead>Editor</TableHead>
-                    <TableHead>Order</TableHead>
+                    <AttrSortHead col="displayOrder" label="Order" />
                     <TableHead>Flags</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="sticky right-0 bg-muted text-right whitespace-nowrap w-px after:absolute after:inset-y-0 after:left-0 after:w-px after:bg-border">
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {attrs.map((attr) => (
+                  {sortedAttrs.map((attr) => (
                     <React.Fragment key={attr.id}>
                       <TableRow
                         className={cn(
@@ -2947,7 +3144,7 @@ function CategoryDefinitions() {
                           <span className="font-medium text-sm">
                             {attr.name}
                           </span>
-                          {attr.isInactive && (
+                          {attr.isObsolete && (
                             <span className="ml-2 text-xs text-muted-foreground italic">
                               (obsolete)
                             </span>
@@ -2978,10 +3175,10 @@ function CategoryDefinitions() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-right">
-                          <TooltipProvider>
+                        <TableCell className="sticky right-0 bg-background text-right whitespace-nowrap w-px after:absolute after:inset-y-0 after:left-0 after:w-px after:bg-border">
+                          <TooltipProvider delayDuration={600}>
                             <div className="flex items-center justify-end gap-1">
-                              <Tooltip>
+                              <Tooltip delayDuration={700}>
                                 <TooltipTrigger asChild>
                                   <Button
                                     variant="ghost"
@@ -3014,24 +3211,20 @@ function CategoryDefinitions() {
                                     : 'Edit'}
                                 </TooltipContent>
                               </Tooltip>
-                              <Tooltip>
+                              <Tooltip delayDuration={700}>
                                 <TooltipTrigger asChild>
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    onClick={() =>
-                                      setAttrs((a) =>
-                                        a.filter((x) => x.id !== attr.id),
-                                      )
-                                    }
+                                    onClick={() => setDeletingAttr(attr)}
                                   >
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>Delete</TooltipContent>
                               </Tooltip>
-                              <Tooltip>
+                              <Tooltip delayDuration={700}>
                                 <TooltipTrigger asChild>
                                   <Button
                                     variant="ghost"
@@ -3043,7 +3236,7 @@ function CategoryDefinitions() {
                                 </TooltipTrigger>
                                 <TooltipContent>Move Up</TooltipContent>
                               </Tooltip>
-                              <Tooltip>
+                              <Tooltip delayDuration={700}>
                                 <TooltipTrigger asChild>
                                   <Button
                                     variant="ghost"
@@ -3059,39 +3252,41 @@ function CategoryDefinitions() {
                           </TooltipProvider>
                         </TableCell>
                       </TableRow>
-                      {/* Inline edit row */}
-                      {editingAttr &&
-                        'id' in editingAttr &&
-                        editingAttr.id === attr.id && (
-                          <TableRow>
-                            <TableCell
-                              colSpan={5}
-                              className="p-0 border-b-2 border-amber-200 dark:border-amber-700/50"
-                            >
-                              <div className="bg-amber-50/60 dark:bg-amber-900/10 px-4 py-4">
-                                <AttributeForm
-                                  form={attrForm}
-                                  setForm={setAttrForm}
-                                />
-                                <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-amber-200 dark:border-amber-700/40">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setEditingAttr(null)
-                                      setAttrForm(emptyAttrForm)
-                                    }}
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button size="sm" onClick={handleSaveAttr}>
-                                    Save Attribute
-                                  </Button>
-                                </div>
+                      <TableRow className="border-0">
+                        <TableCell colSpan={5} className="p-0 border-0">
+                          <AnimateExpand
+                            open={
+                              !!(
+                                editingAttr &&
+                                'id' in editingAttr &&
+                                editingAttr.id === attr.id
+                              )
+                            }
+                          >
+                            <div className="bg-amber-50/60 dark:bg-amber-900/10 px-4 py-4 border-b-2 border-amber-200 dark:border-amber-700/50">
+                              <AttributeForm
+                                form={attrForm}
+                                setForm={setAttrForm}
+                              />
+                              <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-amber-200 dark:border-amber-700/40">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingAttr(null)
+                                    setAttrForm(emptyAttrForm)
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button size="sm" onClick={handleSaveAttr}>
+                                  Save Attribute
+                                </Button>
                               </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
+                            </div>
+                          </AnimateExpand>
+                        </TableCell>
+                      </TableRow>
                     </React.Fragment>
                   ))}
                 </TableBody>
@@ -3124,7 +3319,7 @@ function CategoryDefinitions() {
           }
         }}
       >
-        <DialogContent className="!max-w-5xl h-[85vh] flex flex-col p-0 gap-0">
+        <DialogContent className="!max-w-5xl max-h-[85vh] flex flex-col p-0 gap-0">
           <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
             <DialogTitle>All Attributes</DialogTitle>
             <DialogDescription>
@@ -3184,20 +3379,24 @@ function CategoryDefinitions() {
               </div>
             )}
 
-            <div className="rounded-md border">
+            <div
+              ref={allAttrTableRef}
+              className="rounded-md border overflow-x-auto"
+            >
               <Table>
                 <TableHeader className="bg-muted sticky top-0 z-10">
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Title</TableHead>
+                    <AttrSortHead col="name" label="Name" />
                     <TableHead>Editor</TableHead>
-                    <TableHead>Order</TableHead>
+                    <AttrSortHead col="displayOrder" label="Order" />
                     <TableHead>Flags</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="sticky right-0 bg-muted text-right whitespace-nowrap w-px after:absolute after:inset-y-0 after:left-0 after:w-px after:bg-border">
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {attrs.map((attr) => (
+                  {sortedAttrs.map((attr) => (
                     <React.Fragment key={attr.id}>
                       <TableRow
                         className={cn(
@@ -3212,14 +3411,11 @@ function CategoryDefinitions() {
                           <span className="font-medium text-sm">
                             {attr.name}
                           </span>
-                          {attr.isInactive && (
+                          {attr.isObsolete && (
                             <span className="ml-2 text-xs text-muted-foreground italic">
                               (obsolete)
                             </span>
                           )}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {attr.title}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">{attr.editor}</Badge>
@@ -3246,10 +3442,10 @@ function CategoryDefinitions() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-right">
-                          <TooltipProvider>
+                        <TableCell className="sticky right-0 bg-background text-right whitespace-nowrap w-px after:absolute after:inset-y-0 after:left-0 after:w-px after:bg-border">
+                          <TooltipProvider delayDuration={600}>
                             <div className="flex items-center justify-end gap-1">
-                              <Tooltip>
+                              <Tooltip delayDuration={700}>
                                 <TooltipTrigger asChild>
                                   <Button
                                     variant="ghost"
@@ -3282,17 +3478,13 @@ function CategoryDefinitions() {
                                     : 'Edit'}
                                 </TooltipContent>
                               </Tooltip>
-                              <Tooltip>
+                              <Tooltip delayDuration={700}>
                                 <TooltipTrigger asChild>
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    onClick={() =>
-                                      setAttrs((a) =>
-                                        a.filter((x) => x.id !== attr.id),
-                                      )
-                                    }
+                                    onClick={() => setDeletingAttr(attr)}
                                   >
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
@@ -3303,38 +3495,41 @@ function CategoryDefinitions() {
                           </TooltipProvider>
                         </TableCell>
                       </TableRow>
-                      {editingAttr &&
-                        'id' in editingAttr &&
-                        editingAttr.id === attr.id && (
-                          <TableRow>
-                            <TableCell
-                              colSpan={6}
-                              className="p-0 border-b-2 border-amber-200 dark:border-amber-700/50"
-                            >
-                              <div className="bg-amber-50/60 dark:bg-amber-900/10 px-4 py-4">
-                                <AttributeForm
-                                  form={attrForm}
-                                  setForm={setAttrForm}
-                                />
-                                <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-amber-200 dark:border-amber-700/40">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setEditingAttr(null)
-                                      setAttrForm(emptyAttrForm)
-                                    }}
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button size="sm" onClick={handleSaveAttr}>
-                                    Save Attribute
-                                  </Button>
-                                </div>
+                      <TableRow className="border-0">
+                        <TableCell colSpan={6} className="p-0 border-0">
+                          <AnimateExpand
+                            open={
+                              !!(
+                                editingAttr &&
+                                'id' in editingAttr &&
+                                editingAttr.id === attr.id
+                              )
+                            }
+                          >
+                            <div className="bg-amber-50/60 dark:bg-amber-900/10 px-4 py-4 border-b-2 border-amber-200 dark:border-amber-700/50">
+                              <AttributeForm
+                                form={attrForm}
+                                setForm={setAttrForm}
+                              />
+                              <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-amber-200 dark:border-amber-700/40">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingAttr(null)
+                                    setAttrForm(emptyAttrForm)
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button size="sm" onClick={handleSaveAttr}>
+                                  Save Attribute
+                                </Button>
                               </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
+                            </div>
+                          </AnimateExpand>
+                        </TableCell>
+                      </TableRow>
                     </React.Fragment>
                   ))}
                 </TableBody>
@@ -3381,7 +3576,7 @@ function CategoryDefinitions() {
                   key={entry.id}
                   className="flex items-start gap-4 p-4 bg-muted/40 rounded-lg border"
                 >
-                  <div className="p-2 bg-muted-foreground/20 rounded-lg shrink-0 border border-foreground/20">
+                  <div className="p-2 bg-foreground/10 rounded-lg shrink-0">
                     <RotateCcw className="h-4 w-4 text-foreground" />
                   </div>
                   <div className="flex-1 min-w-0">
