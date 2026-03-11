@@ -1737,7 +1737,7 @@ function AttributeForm({
                 : k.charAt(0).toUpperCase() + k.slice(1)}
             </Label>
             <input
-              value={form[k] as string}
+              value={form[k]}
               onChange={(e) => f(k, e.target.value)}
               className={inputCls}
             />
@@ -2991,9 +2991,9 @@ function CategoryDefinitions() {
               <div className="flex gap-4 py-2">
                 <div
                   className={cn(
-                    'p-3 rounded-xl shrink-0',
+                    'p-3 rounded-xl shrink-0 self-start',
                     toggleConfirm.newStatus === 'inactive'
-                      ? 'bg-amber-50'
+                      ? 'bg-amber-100'
                       : 'bg-green-50',
                   )}
                 >
@@ -3004,7 +3004,7 @@ function CategoryDefinitions() {
                   )}
                 </div>
                 <div>
-                  <p className="text-sm font-medium mb-1">
+                  <p className="text-sm font-medium !mb-0">
                     {toggleConfirm.newStatus === 'inactive'
                       ? `Deactivate "${toggleConfirm.cat.name}"?`
                       : `Activate "${toggleConfirm.cat.name}"?`}
