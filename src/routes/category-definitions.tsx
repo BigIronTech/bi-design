@@ -1117,18 +1117,31 @@ function AnimateExpand({
   open: boolean
   children: React.ReactNode
 }) {
-  const ref = React.useRef<HTMLDivElement>(null)
-  const [height, setHeight] = React.useState(0)
+  const wrapRef = React.useRef<HTMLDivElement>(null)
+  const [height, setHeight] = React.useState<number | 'auto'>(open ? 'auto' : 0)
   const [visible, setVisible] = React.useState(open)
 
   React.useEffect(() => {
+    const el = wrapRef.current
     if (open) {
       setVisible(true)
       requestAnimationFrame(() => {
-        if (ref.current) setHeight(ref.current.scrollHeight)
+        if (!wrapRef.current) return
+        const target = wrapRef.current.scrollHeight
+        setHeight(target)
+        const t = setTimeout(() => setHeight('auto'), 280)
+        return () => clearTimeout(t)
       })
     } else {
-      setHeight(0)
+      if (!el) return
+      // Snapshot current pixel height before transitioning to 0
+      const current = el.scrollHeight
+      setHeight(current)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setHeight(0)
+        })
+      })
       const t = setTimeout(() => setVisible(false), 280)
       return () => clearTimeout(t)
     }
@@ -1138,13 +1151,14 @@ function AnimateExpand({
 
   return (
     <div
+      ref={wrapRef}
       style={{
-        maxHeight: height,
+        height: height === 'auto' ? 'auto' : height,
         overflow: 'hidden',
-        transition: 'max-height 280ms ease-in-out',
+        transition: height === 'auto' ? 'none' : 'height 280ms ease-in-out',
       }}
     >
-      <div ref={ref}>{children}</div>
+      {children}
     </div>
   )
 }
@@ -1287,14 +1301,68 @@ function CategoryTypeahead({
   )
 }
 
+function AccordionSection({
+  id,
+  title,
+  subtitle,
+  faIcon,
+  openSection,
+  onToggle,
+  children,
+}: {
+  id: string
+  title: string
+  subtitle: string
+  faIcon: string
+  openSection: string
+  onToggle: (id: string) => void
+  children: React.ReactNode
+}) {
+  const isOpen = openSection === id
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => onToggle(id)}
+        className="w-full flex items-center gap-3 px-4 py-3 bg-muted/50 hover:bg-muted transition-colors text-left"
+      >
+        <div className="p-1.5 bg-background rounded-md flex items-center justify-center w-7 h-7 shrink-0 border">
+          <i className={`${faIcon} text-xs text-muted-foreground`} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold">{title}</div>
+          <div className="text-xs text-muted-foreground truncate">
+            {subtitle}
+          </div>
+        </div>
+        <ChevronDown
+          className={cn(
+            'h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200',
+            isOpen && 'rotate-180',
+          )}
+        />
+      </button>
+      <AnimateExpand open={isOpen}>
+        <div className="px-4 py-4 space-y-3 border-t">{children}</div>
+      </AnimateExpand>
+    </div>
+  )
+}
+
 function CategoryForm({
   form,
   setForm,
   allCategoryGroups,
+  guid,
+  openSection,
+  onToggleSection,
 }: {
   form: CatFormState
   setForm: React.Dispatch<React.SetStateAction<CatFormState>>
   allCategoryGroups: Array<string>
+  guid?: string
+  openSection: string
+  onToggleSection: (id: string) => void
 }) {
   const f = (field: keyof CatFormState, val: string | boolean) =>
     setForm((prev) => ({ ...prev, [field]: val }))
@@ -1317,15 +1385,17 @@ function CategoryForm({
       : form.category || form.name || ''
 
   return (
-    <div className="space-y-6">
-      {/* Basic Info */}
-      <div>
-        <SectionHeader
-          title="Basic Information"
-          subtitle="Core identifiers and configuration"
-          faIcon="fa-regular fa-address-card"
-        />
-        <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-2">
+      <AccordionSection
+        id="basic"
+        title="Basic Information"
+        subtitle="Core identifiers and configuration"
+        faIcon="fa-regular fa-address-card"
+        openSection={openSection}
+        onToggle={onToggleSection}
+      >
+        {/* Row 1: Category + Subcategory */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label>
               Category <span className="text-destructive">*</span>
@@ -1356,10 +1426,13 @@ function CategoryForm({
                 )
               }}
               placeholder="e.g. Tractors"
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className={inputCls}
             />
           </div>
-          <div className="col-span-2 space-y-1.5">
+        </div>
+        {/* Row 2: Title + GUID */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
             <Label>Title</Label>
             <input
               value={autoTitle}
@@ -1371,13 +1444,28 @@ function CategoryForm({
             </p>
           </div>
           <div className="space-y-1.5">
+            <Label>GUID</Label>
+            <input
+              value={guid ?? ''}
+              readOnly
+              placeholder="ID will be assigned upon completion of this form"
+              className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-not-allowed font-mono placeholder:font-sans placeholder:text-xs placeholder:italic"
+            />
+            <p className="text-xs text-muted-foreground italic">
+              {guid ? 'Read only' : 'Assigned on save'}
+            </p>
+          </div>
+        </div>
+        {/* Row 3: Auction Order + Category Display Order + Auction Extension */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="space-y-1.5">
             <Label>Auction Order</Label>
             <input
               type="number"
               value={form.auctionOrder}
               onChange={(e) => f('auctionOrder', e.target.value)}
               placeholder="e.g. 1000"
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className={inputCls}
             />
           </div>
           <div className="space-y-1.5">
@@ -1387,7 +1475,7 @@ function CategoryForm({
               value={form.categoryDisplayOrder}
               onChange={(e) => f('categoryDisplayOrder', e.target.value)}
               placeholder="e.g. 1970"
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className={inputCls}
             />
           </div>
           <div className="space-y-1.5">
@@ -1396,7 +1484,7 @@ function CategoryForm({
               <select
                 value={form.auctionExtension}
                 onChange={(e) => f('auctionExtension', e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring appearance-none"
+                className={selectCls}
               >
                 {AUCTION_EXTENSIONS.map((v) => (
                   <option key={v} value={v}>
@@ -1407,13 +1495,16 @@ function CategoryForm({
               <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             </div>
           </div>
+        </div>
+        {/* Row 4: Priority + Vertical + Effective Date */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="space-y-1.5">
             <Label>Priority</Label>
             <div className="relative">
               <select
                 value={form.priority}
                 onChange={(e) => f('priority', e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring appearance-none"
+                className={selectCls}
               >
                 {PRIORITIES.map((v) => (
                   <option key={v} value={v}>
@@ -1430,7 +1521,7 @@ function CategoryForm({
               <select
                 value={form.vertical}
                 onChange={(e) => f('vertical', e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring appearance-none"
+                className={selectCls}
               >
                 <option value="">Select vertical...</option>
                 {VERTICALS.map((v) => (
@@ -1448,126 +1539,148 @@ function CategoryForm({
               type="date"
               value={form.effectiveDate || ''}
               onChange={(e) => f('effectiveDate', e.target.value)}
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className={inputCls}
             />
           </div>
-          <div className="col-span-2 space-y-1.5">
+        </div>
+        {/* Row 5: Legacy Title + Is Obsolete */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+          <div className="sm:col-span-2 space-y-1.5">
             <Label>Legacy Title</Label>
             <input
               value={form.legacyTitle}
               onChange={(e) => f('legacyTitle', e.target.value)}
               placeholder="e.g. Farm - Tractors"
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className={inputCls}
+            />
+          </div>
+          <div className="flex items-center gap-2 pb-1">
+            <input
+              type="checkbox"
+              id="isObsolete"
+              checked={!!form.isObsolete}
+              onChange={(e) => f('isObsolete', e.target.checked)}
+              className="h-4 w-4 rounded border-input"
+            />
+            <Label htmlFor="isObsolete" className="cursor-pointer font-normal">
+              Is obsolete?
+            </Label>
+          </div>
+        </div>
+      </AccordionSection>
+
+      <AccordionSection
+        id="heading"
+        title="Heading"
+        subtitle="Controls grouping in the dropdown on the sales site."
+        faIcon="fa-solid fa-table"
+        openSection={openSection}
+        onToggle={onToggleSection}
+      >
+        <div className="grid grid-cols-3 gap-3">
+          <div className="col-span-2 space-y-1.5">
+            <Label>Level 1</Label>
+            <input
+              value={form.heading.level1}
+              onChange={(e) => fh('level1', e.target.value)}
+              placeholder="e.g. Asphalt / Paving Equipment"
+              className={inputCls}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Display Order</Label>
+            <input
+              type="number"
+              value={form.heading.displayOrder1}
+              onChange={(e) => fh('displayOrder1', e.target.value)}
+              placeholder="230"
+              className={inputCls}
             />
           </div>
         </div>
-      </div>
-
-      {/* Heading */}
-      <div>
-        <SectionHeader
-          title="Heading"
-          subtitle="Controls grouping in dropdown selection on sales site."
-          faIcon="fa-solid fa-table"
-        />
-        <div className="grid grid-cols-2 gap-4">
-          {[
-            {
-              label: 'Level 1',
-              key: 'level1',
-              placeholder: 'e.g. Asphalt / Paving Equipment',
-              hint: 'Primary heading group',
-            },
-            {
-              label: 'Display Order 1',
-              key: 'displayOrder1',
-              placeholder: '230',
-              type: 'number',
-            },
-            {
-              label: 'Level 2',
-              key: 'level2',
-              placeholder: 'e.g. Burners',
-              hint: 'Secondary heading group',
-            },
-            {
-              label: 'Display Order 2',
-              key: 'displayOrder2',
-              placeholder: '100',
-              type: 'number',
-            },
-          ].map(({ label, key, placeholder, hint, type }) => (
-            <div key={key} className="space-y-1.5">
-              <Label>{label}</Label>
-              <input
-                type={type || 'text'}
-                value={(form.heading as Record<string, string>)[key]}
-                onChange={(e) => fh(key, e.target.value)}
-                placeholder={placeholder}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              />
-              {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-            </div>
-          ))}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="col-span-2 space-y-1.5">
+            <Label>Level 2</Label>
+            <input
+              value={form.heading.level2}
+              onChange={(e) => fh('level2', e.target.value)}
+              placeholder="e.g. Burners"
+              className={inputCls}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Display Order</Label>
+            <input
+              type="number"
+              value={form.heading.displayOrder2}
+              onChange={(e) => fh('displayOrder2', e.target.value)}
+              placeholder="100"
+              className={inputCls}
+            />
+          </div>
         </div>
-      </div>
+      </AccordionSection>
 
-      {/* Parent Config */}
-      <div>
-        <SectionHeader
-          title="Parent Configuration"
-          subtitle="Used for auction site display, grouping and ordering."
-          faIcon="fa-solid fa-sitemap"
-        />
-        <div className="grid grid-cols-2 gap-4">
-          {[
-            {
-              label: 'Display Name',
-              key: 'displayName',
-              placeholder: 'Display Name',
-            },
-            {
-              label: 'Parent Display Order',
-              key: 'parentDisplayOrder',
-              placeholder: '0',
-              type: 'number',
-            },
-            {
-              label: 'Parent 1',
-              key: 'parent1',
-              placeholder: 'First level category',
-              hint: 'First level category',
-            },
-            {
-              label: 'Parent 2',
-              key: 'parent2',
-              placeholder: 'Second level category',
-              hint: 'Second level category',
-            },
-          ].map(({ label, key, placeholder, hint, type }) => (
-            <div key={key} className="space-y-1.5">
-              <Label>{label}</Label>
-              <input
-                type={type || 'text'}
-                value={(form.parentConfig as Record<string, string>)[key]}
-                onChange={(e) => fp(key, e.target.value)}
-                placeholder={placeholder}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              />
-              {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-            </div>
-          ))}
+      <AccordionSection
+        id="parent"
+        title="Parent Configuration"
+        subtitle="Used for auction site display, grouping and ordering."
+        faIcon="fa-solid fa-sitemap"
+        openSection={openSection}
+        onToggle={onToggleSection}
+      >
+        <div className="grid grid-cols-3 gap-3">
+          <div className="col-span-2 space-y-1.5">
+            <Label>Display Name</Label>
+            <input
+              value={form.parentConfig.displayName}
+              onChange={(e) => fp('displayName', e.target.value)}
+              placeholder="Display Name"
+              className={inputCls}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Display Order</Label>
+            <input
+              type="number"
+              value={form.parentConfig.parentDisplayOrder}
+              onChange={(e) => fp('parentDisplayOrder', e.target.value)}
+              placeholder="0"
+              className={inputCls}
+            />
+          </div>
         </div>
-      </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label>Parent 1</Label>
+            <input
+              value={form.parentConfig.parent1}
+              onChange={(e) => fp('parent1', e.target.value)}
+              placeholder="First level category"
+              className={inputCls}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Parent 2</Label>
+            <input
+              value={form.parentConfig.parent2}
+              onChange={(e) => fp('parent2', e.target.value)}
+              placeholder="Second level category"
+              className={inputCls}
+            />
+          </div>
+        </div>
+      </AccordionSection>
 
-      {/* Industries */}
-      <div>
-        <SectionHeader
-          title="Industries"
-          subtitle="Industries appear in the side navigation bar. A subcategory may belong to 1 or 2 industries."
-          faIcon="fa-solid fa-industry"
-        />
-        <div className="grid grid-cols-2 gap-4">
+      <AccordionSection
+        id="industries"
+        title="Industries"
+        subtitle="A subcategory may belong to 1 or 2 industries."
+        faIcon="fa-solid fa-industry"
+        openSection={openSection}
+        onToggle={onToggleSection}
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {['industry1', 'industry2'].map((key, i) => (
             <div key={key} className="space-y-1.5">
               <Label>Industry {i + 1}</Label>
@@ -1575,7 +1688,7 @@ function CategoryForm({
                 <select
                   value={(form.industries as Record<string, string>)[key]}
                   onChange={(e) => fi(key, e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring appearance-none"
+                  className={selectCls}
                 >
                   <option value="">None</option>
                   {INDUSTRIES.map((v) => (
@@ -1589,7 +1702,7 @@ function CategoryForm({
             </div>
           ))}
         </div>
-      </div>
+      </AccordionSection>
     </div>
   )
 }
@@ -1999,6 +2112,8 @@ function CategoryDefinitions() {
   } | null>(null)
   const [showFilters, setShowFilters] = useState(false)
   const [showAllAttrs, setShowAllAttrs] = useState(false)
+  const [createOpenSection, setCreateOpenSection] = useState<string>('basic')
+  const [editOpenSection, setEditOpenSection] = useState<string>('basic')
   const [toggleConfirm, setToggleConfirm] = useState<{
     cat: CategoryDefinition
     newStatus: 'active' | 'inactive'
@@ -2847,59 +2962,85 @@ function CategoryDefinitions() {
       {/* ── Create Category Dialog ── */}
       <Dialog
         open={showCreate}
-        onOpenChange={(o) => !o && setShowCreate(false)}
+        onOpenChange={(o) => {
+          if (!o) {
+            setShowCreate(false)
+            setCreateOpenSection('basic')
+          }
+        }}
       >
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add Subcategory</DialogTitle>
-            <DialogDescription>
-              Create a new subcategory definition
-            </DialogDescription>
-          </DialogHeader>
-          <CategoryForm
-            form={catForm}
-            setForm={setCatForm}
-            allCategoryGroups={uniqueGroups}
-          />
-          <DialogFooter>
+        <DialogContent
+          className="flex flex-col p-0 gap-0"
+          style={{ maxWidth: '56rem', width: '90vw', maxHeight: '90vh' }}
+        >
+          <div className="px-6 pt-6 pb-4 border-b shrink-0">
+            <DialogHeader>
+              <DialogTitle>Add Subcategory</DialogTitle>
+              <DialogDescription>
+                Create a new subcategory definition
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="overflow-y-auto px-6 py-4">
+            <CategoryForm
+              form={catForm}
+              setForm={setCatForm}
+              allCategoryGroups={uniqueGroups}
+              openSection={createOpenSection}
+              onToggleSection={(id) =>
+                setCreateOpenSection((prev) => (prev === id ? '' : id))
+              }
+            />
+          </div>
+          <div className="px-6 py-4 border-t shrink-0 flex justify-end gap-2">
             <Button variant="outline" onClick={() => setShowCreate(false)}>
               Cancel
             </Button>
             <Button onClick={handleCreateCategory}>Create Subcategory</Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* ── Edit Category Dialog ── */}
       <Dialog
         open={!!editingCat}
-        onOpenChange={(o) => !o && setEditingCat(null)}
+        onOpenChange={(o) => {
+          if (!o) {
+            setEditingCat(null)
+            setEditOpenSection('basic')
+          }
+        }}
       >
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit — {editingCat?.name}</DialogTitle>
-            {editingCat?.guid && (
-              <div className="flex items-center gap-2 pt-1">
-                <span className="inline-flex items-center font-mono text-[11px] bg-gray-900 text-gray-100 rounded px-2 py-0.5 tracking-wide select-all">
-                  {editingCat.guid}
-                </span>
-              </div>
-            )}
-            <DialogDescription>
-              Update subcategory definition details
-            </DialogDescription>
-          </DialogHeader>
-          <CategoryForm
-            form={catForm}
-            setForm={setCatForm}
-            allCategoryGroups={uniqueGroups}
-          />
-          <DialogFooter>
+        <DialogContent
+          className="flex flex-col p-0 gap-0"
+          style={{ maxWidth: '56rem', width: '90vw', maxHeight: '90vh' }}
+        >
+          <div className="px-6 pt-6 pb-4 border-b shrink-0">
+            <DialogHeader>
+              <DialogTitle>Edit — {editingCat?.name}</DialogTitle>
+              <DialogDescription>
+                Update subcategory definition details
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="overflow-y-auto px-6 py-4">
+            <CategoryForm
+              form={catForm}
+              setForm={setCatForm}
+              allCategoryGroups={uniqueGroups}
+              guid={editingCat?.guid}
+              openSection={editOpenSection}
+              onToggleSection={(id) =>
+                setEditOpenSection((prev) => (prev === id ? '' : id))
+              }
+            />
+          </div>
+          <div className="px-6 py-4 border-t shrink-0 flex justify-end gap-2">
             <Button variant="outline" onClick={() => setEditingCat(null)}>
               Cancel
             </Button>
             <Button onClick={handleSaveEdit}>Save Changes</Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -2914,11 +3055,11 @@ function CategoryDefinitions() {
             <DialogDescription>This action cannot be undone.</DialogDescription>
           </DialogHeader>
           <div className="flex gap-4 py-2">
-            <div className="p-3 bg-destructive/10 rounded-xl shrink-0 self-start">
+            <div className="p-3 bg-destructive/10 rounded-xl shrink-0">
               <Trash2 className="h-5 w-5 text-destructive" />
             </div>
             <div>
-              <p className="text-sm font-medium !mb-0">
+              <p className="text-sm font-medium mb-1">
                 Are you sure you want to delete "{deletingCat?.name}"?
               </p>
               <p className="text-sm text-muted-foreground">
@@ -2948,11 +3089,11 @@ function CategoryDefinitions() {
             <DialogDescription>This action cannot be undone.</DialogDescription>
           </DialogHeader>
           <div className="flex gap-4 py-2">
-            <div className="p-3 bg-destructive/10 rounded-xl shrink-0 self-start">
+            <div className="p-3 bg-destructive/10 rounded-xl shrink-0">
               <Trash2 className="h-5 w-5 text-destructive" />
             </div>
             <div>
-              <p className="text-sm font-medium !mb-0">
+              <p className="text-sm font-medium mb-1">
                 Are you sure you want to delete "{deletingAttr?.name}"?
               </p>
               <p className="text-sm text-muted-foreground">
@@ -2991,9 +3132,9 @@ function CategoryDefinitions() {
               <div className="flex gap-4 py-2">
                 <div
                   className={cn(
-                    'p-3 rounded-xl shrink-0 self-start',
+                    'p-3 rounded-xl shrink-0',
                     toggleConfirm.newStatus === 'inactive'
-                      ? 'bg-amber-100'
+                      ? 'bg-amber-50'
                       : 'bg-green-50',
                   )}
                 >
@@ -3004,7 +3145,7 @@ function CategoryDefinitions() {
                   )}
                 </div>
                 <div>
-                  <p className="text-sm font-medium !mb-0">
+                  <p className="text-sm font-medium mb-1">
                     {toggleConfirm.newStatus === 'inactive'
                       ? `Deactivate "${toggleConfirm.cat.name}"?`
                       : `Activate "${toggleConfirm.cat.name}"?`}
