@@ -107,12 +107,11 @@ const INDUSTRIES = [
   'Agriculture',
   'Construction',
   'Transportation',
-  'Collector Cars',
-  'Recreation',
-  'Forestry',
+  'Livestock',
   'Real Estate',
-  'Oil & Gas',
-  'Miscellaneous',
+  'Industrial',
+  'Classic Cars',
+  'Other',
 ]
 
 const VERTICALS = [
@@ -135,6 +134,8 @@ const ATTRIBUTE_EDITORS = [
   'Checkbox',
   'Dropdown',
   'Hidden',
+  'Number',
+  'Select',
   'Text',
   'Text with Dropdown',
 ]
@@ -252,6 +253,8 @@ interface AttrFormState {
   migration: string
   [key: string]: string | boolean
 }
+
+type AttrOverride = Partial<AttrFormState>
 
 interface CatFormState {
   name: string
@@ -1052,7 +1055,58 @@ function buildCategory(rawTitle: string, idx: number): CategoryDefinition {
   }
 }
 
-const categories: Array<CategoryDefinition> = RAW_TITLES.map(buildCategory)
+const ALL_ATTR_IDS = [
+  'a1',
+  'a2',
+  'a3',
+  'a4',
+  'a5',
+  'a6',
+  'a7',
+  'a8',
+  'a9',
+  'a10',
+  'a11',
+  'a12',
+  'a13',
+  'a14',
+  'a15',
+  'a16',
+  'a17',
+  'a18',
+  'a19',
+  'a20',
+  'a21',
+  'a22',
+  'a23',
+  'a24',
+  'a25',
+  'a26',
+  'a27',
+  'a28',
+  'a29',
+]
+
+function seedAttrIds(idx: number): Array<string> {
+  const count = 4 + ((idx * 7 + 3) % 9)
+  const pool = [...ALL_ATTR_IDS]
+  const result: Array<string> = []
+  let s = idx + 1
+  for (let i = 0; i < count; i++) {
+    s = (s * 1664525 + 1013904223) >>> 0
+    const pick = s % pool.length
+    result.push(pool[pick])
+    pool.splice(pick, 1)
+  }
+  return result.sort(
+    (a, b) => ALL_ATTR_IDS.indexOf(a) - ALL_ATTR_IDS.indexOf(b),
+  )
+}
+
+const categories: Array<CategoryDefinition> = RAW_TITLES.map((t, i) => {
+  const cat = buildCategory(t, i)
+  return cat
+})
 
 // ── Empty form defaults ────────────────────────────────────────────────────────
 
@@ -1749,24 +1803,96 @@ function SelectField({
   )
 }
 
+function AttrRevertBtn({
+  field,
+  form,
+  baseForm,
+  onRevertField,
+}: {
+  field: string
+  form: AttrFormState
+  baseForm?: AttrFormState
+  onRevertField?: (field: string) => void
+}) {
+  if (!baseForm || !onRevertField) return null
+  if (String(form[field]) === String(baseForm[field])) return null
+  return (
+    <TooltipProvider delayDuration={400}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => onRevertField(field)}
+            className="shrink-0 p-1 rounded text-amber-500 hover:text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+          >
+            <RotateCcw className="h-3 w-3" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          Revert to default
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
+
+function AttrFieldWrap({
+  field,
+  form,
+  baseForm,
+  onRevertField,
+  children,
+}: {
+  field: string
+  form: AttrFormState
+  baseForm?: AttrFormState
+  onRevertField?: (field: string) => void
+  children: React.ReactNode
+}) {
+  const dirty =
+    !!baseForm &&
+    !!onRevertField &&
+    String(form[field]) !== String(baseForm[field])
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-1',
+        dirty && 'ring-1 ring-amber-300 dark:ring-amber-600 rounded-md',
+      )}
+    >
+      <div className="flex-1 min-w-0">{children}</div>
+      <AttrRevertBtn
+        field={field}
+        form={form}
+        baseForm={baseForm}
+        onRevertField={onRevertField}
+      />
+    </div>
+  )
+}
+
 function AttributeForm({
   form,
   setForm,
+  baseForm,
+  onRevertField,
 }: {
   form: AttrFormState
   setForm: React.Dispatch<React.SetStateAction<AttrFormState>>
+  baseForm?: AttrFormState
+  onRevertField?: (field: string) => void
 }) {
   const f = (field: string, val: string | boolean) =>
     setForm((prev) => ({ ...prev, [field]: val }))
 
   const flagFields: Array<[string, string]> = [
-    ['isOptional', 'Is Optional?'],
-    ['appendToDescription', 'Append to Description?'],
-    ['notInDescription', 'Not in Description?'],
-    ['isSpecification', 'Is Specification?'],
-    ['isChecklist', 'Is Checklist?'],
-    ['shouldHideOnSold', 'Should Hide on Sold?'],
-    ['includeInNewChecklist', 'Include in New Checklist?'],
+    ['isOptional', 'Is Optional'],
+    ['appendToDescription', 'Append to Description'],
+    ['notInDescription', 'Not in Description'],
+    ['isSpecification', 'Is Specification'],
+    ['isChecklist', 'Is Checklist'],
+    ['shouldHideOnSold', 'Should Hide on Sold'],
+    ['includeInNewChecklist', 'Include in New Checklist'],
   ]
 
   return (
@@ -1776,40 +1902,80 @@ function AttributeForm({
           <Label>
             Name <span className="text-destructive">*</span>
           </Label>
-          <input
-            value={form.name}
-            onChange={(e) => f('name', e.target.value)}
-            placeholder="e.g. Model"
-            className={inputCls}
-          />
+          <AttrFieldWrap
+            field="name"
+            form={form}
+            baseForm={baseForm}
+            onRevertField={onRevertField}
+          >
+            <input
+              value={form.name}
+              onChange={(e) => f('name', e.target.value)}
+              placeholder="e.g. Model"
+              className={inputCls}
+            />
+          </AttrFieldWrap>
         </div>
         <div className="space-y-1.5">
           <Label>
             Title <span className="text-destructive">*</span>
           </Label>
-          <input
-            value={form.title}
-            onChange={(e) => f('title', e.target.value)}
-            placeholder="e.g. Model"
-            className={inputCls}
-          />
+          <AttrFieldWrap
+            field="title"
+            form={form}
+            baseForm={baseForm}
+            onRevertField={onRevertField}
+          >
+            <input
+              value={form.title}
+              onChange={(e) => f('title', e.target.value)}
+              placeholder="e.g. Model"
+              className={inputCls}
+            />
+          </AttrFieldWrap>
         </div>
-        <SelectField
-          label="Editor"
-          required
-          value={form.editor}
-          onChange={(v) => f('editor', v)}
-          options={ATTRIBUTE_EDITORS}
-        />
+        <div className="space-y-1.5">
+          <Label>
+            Editor <span className="text-destructive">*</span>
+          </Label>
+          <AttrFieldWrap
+            field="editor"
+            form={form}
+            baseForm={baseForm}
+            onRevertField={onRevertField}
+          >
+            <div className="relative">
+              <select
+                value={form.editor}
+                onChange={(e) => f('editor', e.target.value)}
+                className={selectCls}
+              >
+                {ATTRIBUTE_EDITORS.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            </div>
+          </AttrFieldWrap>
+        </div>
         <div className="space-y-1.5">
           <Label>Display Order</Label>
-          <input
-            type="number"
-            value={form.displayOrder}
-            onChange={(e) => f('displayOrder', e.target.value)}
-            placeholder="30"
-            className={inputCls}
-          />
+          <AttrFieldWrap
+            field="displayOrder"
+            form={form}
+            baseForm={baseForm}
+            onRevertField={onRevertField}
+          >
+            <input
+              type="number"
+              value={form.displayOrder}
+              onChange={(e) => f('displayOrder', e.target.value)}
+              placeholder="30"
+              className={inputCls}
+            />
+          </AttrFieldWrap>
         </div>
       </div>
 
@@ -1825,21 +1991,48 @@ function AttributeForm({
                 checked={form[key] as boolean}
                 onCheckedChange={(val) => f(key, !!val)}
               />
-              <label htmlFor={`attr-${key}`} className="text-sm cursor-pointer">
+              <label
+                htmlFor={`attr-${key}`}
+                className="text-sm cursor-pointer flex-1"
+              >
                 {label}
               </label>
+              <AttrRevertBtn
+                field={key}
+                form={form}
+                baseForm={baseForm}
+                onRevertField={onRevertField}
+              />
             </div>
           ))}
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <SelectField
-          label="Facet"
-          value={form.facet || 'None'}
-          onChange={(v) => f('facet', v)}
-          options={FACET_OPTIONS}
-        />
+        <div className="space-y-1.5">
+          <Label>Facet</Label>
+          <AttrFieldWrap
+            field="facet"
+            form={form}
+            baseForm={baseForm}
+            onRevertField={onRevertField}
+          >
+            <div className="relative">
+              <select
+                value={form.facet || 'None'}
+                onChange={(e) => f('facet', e.target.value)}
+                className={selectCls}
+              >
+                {FACET_OPTIONS.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            </div>
+          </AttrFieldWrap>
+        </div>
         {(
           ['prefix', 'value', 'suffix', 'units', 'unitsSeparator'] as const
         ).map((k) => (
@@ -1849,11 +2042,18 @@ function AttributeForm({
                 ? 'Units Separator'
                 : k.charAt(0).toUpperCase() + k.slice(1)}
             </Label>
-            <input
-              value={form[k]}
-              onChange={(e) => f(k, e.target.value)}
-              className={inputCls}
-            />
+            <AttrFieldWrap
+              field={k}
+              form={form}
+              baseForm={baseForm}
+              onRevertField={onRevertField}
+            >
+              <input
+                value={form[k] as string}
+                onChange={(e) => f(k, e.target.value)}
+                className={inputCls}
+              />
+            </AttrFieldWrap>
           </div>
         ))}
       </div>
@@ -1870,9 +2070,18 @@ function AttributeForm({
                 checked={form.isYesNo}
                 onCheckedChange={(val) => f('isYesNo', !!val)}
               />
-              <label htmlFor="attr-isYesNo" className="text-sm cursor-pointer">
-                Is Yes/No?
+              <label
+                htmlFor="attr-isYesNo"
+                className="text-sm cursor-pointer flex-1"
+              >
+                Is Yes/No
               </label>
+              <AttrRevertBtn
+                field="isYesNo"
+                form={form}
+                baseForm={baseForm}
+                onRevertField={onRevertField}
+              />
             </div>
             <div className="flex items-center gap-2">
               <Checkbox
@@ -1880,18 +2089,34 @@ function AttributeForm({
                 checked={form.omitYes}
                 onCheckedChange={(val) => f('omitYes', !!val)}
               />
-              <label htmlFor="attr-omitYes" className="text-sm cursor-pointer">
-                Omit Yes?
+              <label
+                htmlFor="attr-omitYes"
+                className="text-sm cursor-pointer flex-1"
+              >
+                Omit Yes
               </label>
+              <AttrRevertBtn
+                field="omitYes"
+                form={form}
+                baseForm={baseForm}
+                onRevertField={onRevertField}
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Yes Value</Label>
-              <input
-                value={form.yesValue}
-                onChange={(e) => f('yesValue', e.target.value)}
-                placeholder="YesValue"
-                className={inputCls}
-              />
+              <AttrFieldWrap
+                field="yesValue"
+                form={form}
+                baseForm={baseForm}
+                onRevertField={onRevertField}
+              >
+                <input
+                  value={form.yesValue}
+                  onChange={(e) => f('yesValue', e.target.value)}
+                  placeholder="YesValue"
+                  className={inputCls}
+                />
+              </AttrFieldWrap>
             </div>
           </div>
           <div className="space-y-2">
@@ -1904,18 +2129,34 @@ function AttributeForm({
                 checked={form.omitNo}
                 onCheckedChange={(val) => f('omitNo', !!val)}
               />
-              <label htmlFor="attr-omitNo" className="text-sm cursor-pointer">
-                Omit No?
+              <label
+                htmlFor="attr-omitNo"
+                className="text-sm cursor-pointer flex-1"
+              >
+                Omit No
               </label>
+              <AttrRevertBtn
+                field="omitNo"
+                form={form}
+                baseForm={baseForm}
+                onRevertField={onRevertField}
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">No Value</Label>
-              <input
-                value={form.noValue}
-                onChange={(e) => f('noValue', e.target.value)}
-                placeholder="NoValue"
-                className={inputCls}
-              />
+              <AttrFieldWrap
+                field="noValue"
+                form={form}
+                baseForm={baseForm}
+                onRevertField={onRevertField}
+              >
+                <input
+                  value={form.noValue}
+                  onChange={(e) => f('noValue', e.target.value)}
+                  placeholder="NoValue"
+                  className={inputCls}
+                />
+              </AttrFieldWrap>
             </div>
           </div>
         </div>
@@ -1930,10 +2171,16 @@ function AttributeForm({
           />
           <label
             htmlFor="attr-suppressSalebill"
-            className="text-sm cursor-pointer"
+            className="text-sm cursor-pointer flex-1"
           >
-            Suppress Salebill?
+            Suppress Salebill
           </label>
+          <AttrRevertBtn
+            field="suppressSalebill"
+            form={form}
+            baseForm={baseForm}
+            onRevertField={onRevertField}
+          />
         </div>
         <div className="flex items-center gap-2">
           <Checkbox
@@ -1943,39 +2190,77 @@ function AttributeForm({
           />
           <label
             htmlFor="attr-suppressNewspaper"
-            className="text-sm cursor-pointer"
+            className="text-sm cursor-pointer flex-1"
           >
-            Suppress Newspaper?
+            Suppress Newspaper
           </label>
+          <AttrRevertBtn
+            field="suppressNewspaper"
+            form={form}
+            baseForm={baseForm}
+            onRevertField={onRevertField}
+          />
         </div>
       </div>
 
       <div className="space-y-1.5">
         <Label>Values</Label>
-        <Textarea
-          value={form.values}
-          onChange={(e) => f('values', e.target.value)}
-          placeholder="Comma-separated list of allowed values"
-          rows={2}
-        />
+        <AttrFieldWrap
+          field="values"
+          form={form}
+          baseForm={baseForm}
+          onRevertField={onRevertField}
+        >
+          <Textarea
+            value={form.values}
+            onChange={(e) => f('values', e.target.value)}
+            placeholder="Comma-separated list of allowed values"
+            rows={2}
+          />
+        </AttrFieldWrap>
       </div>
 
       <div className="space-y-1.5">
         <Label>Notes</Label>
-        <Textarea
-          value={form.notes}
-          onChange={(e) => f('notes', e.target.value)}
-          placeholder="e.g. Model. For example, '4440' or 'F-150'"
-          rows={2}
-        />
+        <AttrFieldWrap
+          field="notes"
+          form={form}
+          baseForm={baseForm}
+          onRevertField={onRevertField}
+        >
+          <Textarea
+            value={form.notes}
+            onChange={(e) => f('notes', e.target.value)}
+            placeholder="e.g. Model. For example, '4440' or 'F-150'"
+            rows={2}
+          />
+        </AttrFieldWrap>
       </div>
 
-      <SelectField
-        label="Migration"
-        value={form.migration || 'None'}
-        onChange={(v) => f('migration', v)}
-        options={MIGRATION_OPTIONS}
-      />
+      <div className="space-y-1.5">
+        <Label>Migration</Label>
+        <AttrFieldWrap
+          field="migration"
+          form={form}
+          baseForm={baseForm}
+          onRevertField={onRevertField}
+        >
+          <div className="relative">
+            <select
+              value={form.migration || 'None'}
+              onChange={(e) => f('migration', e.target.value)}
+              className={selectCls}
+            >
+              {MIGRATION_OPTIONS.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          </div>
+        </AttrFieldWrap>
+      </div>
     </div>
   )
 }
@@ -2101,7 +2386,16 @@ function CategoryDefinitions() {
   )
   const [deletingAttr, setDeletingAttr] = useState<Attribute | null>(null)
   const [attrsCat, setAttrsCat] = useState<CategoryDefinition | null>(null)
-  const [attrs, setAttrs] = useState<Array<Attribute>>(mockAttributes)
+  const [attrPool, setAttrPool] = useState<Record<string, Attribute>>(() =>
+    Object.fromEntries(mockAttributes.map((a) => [a.id, a])),
+  )
+  const [catAttrIds, setCatAttrIds] = useState<Record<string, Array<string>>>(
+    () => Object.fromEntries(categories.map((c, i) => [c.id, seedAttrIds(i)])),
+  )
+  const [catAttrOverrides, setCatAttrOverrides] = useState<
+    Record<string, Record<string, AttrOverride>>
+  >({})
+  const [assigningAttr, setAssigningAttr] = useState<string | null>(null)
   const [editingAttr, setEditingAttr] = useState<
     Attribute | { id: string } | null
   >(null)
@@ -2217,16 +2511,47 @@ function CategoryDefinitions() {
     }
   }
 
-  const sortedAttrs = useMemo(() => {
-    if (!attrSortCol) return attrs
-    return [...attrs].sort((a, b) => {
+  const getEffectiveAttr = (catId: string, attrId: string): Attribute => {
+    const base = attrPool[attrId]
+    const override = catAttrOverrides[catId]?.[attrId] ?? {}
+    return { ...base, ...override }
+  }
+
+  const hasOverride = (catId: string, attrId: string): boolean =>
+    !!catAttrOverrides[catId]?.[attrId] &&
+    Object.keys(catAttrOverrides[catId][attrId]).length > 0
+
+  const currentCatAttrs: Array<Attribute> = useMemo(() => {
+    if (!attrsCat) return []
+    const ids = catAttrIds[attrsCat.id] ?? []
+    return ids.map((id) => getEffectiveAttr(attrsCat.id, id)).filter(Boolean)
+  }, [attrsCat, catAttrIds, attrPool, catAttrOverrides])
+
+  const allAttrs: Array<Attribute> = useMemo(
+    () => Object.values(attrPool),
+    [attrPool],
+  )
+
+  const sortAttrs = (list: Array<Attribute>) => {
+    if (!attrSortCol) return list
+    return [...list].sort((a, b) => {
       const av = attrSortCol === 'name' ? a.name.toLowerCase() : a.displayOrder
       const bv = attrSortCol === 'name' ? b.name.toLowerCase() : b.displayOrder
       if (av < bv) return attrSortDir === 'asc' ? -1 : 1
       if (av > bv) return attrSortDir === 'asc' ? 1 : -1
       return 0
     })
-  }, [attrs, attrSortCol, attrSortDir])
+  }
+
+  const sortedCatAttrs = useMemo(
+    () => sortAttrs(currentCatAttrs),
+    [currentCatAttrs, attrSortCol, attrSortDir],
+  )
+
+  const sortedAllAttrs = useMemo(
+    () => sortAttrs(allAttrs),
+    [allAttrs, attrSortCol, attrSortDir],
+  )
 
   const handleCreateCategory = () => {
     if (!catForm.name || !catForm.title) {
@@ -2299,29 +2624,91 @@ function CategoryDefinitions() {
       return
     }
     if (editingAttr && editingAttr.id !== 'new') {
-      setAttrs((prev) =>
-        prev.map((a) =>
-          a.id === editingAttr.id
-            ? ({
-                ...a,
-                ...attrForm,
-                displayOrder: Number(attrForm.displayOrder),
-              } as Attribute)
-            : a,
-        ),
-      )
-    } else {
-      setAttrs((prev) => [
+      setAttrPool((prev) => ({
         ...prev,
-        {
+        [editingAttr.id]: {
+          ...prev[editingAttr.id],
           ...attrForm,
-          id: `a${Date.now()}`,
           displayOrder: Number(attrForm.displayOrder),
         } as Attribute,
-      ])
+      }))
+    } else {
+      const newId = `a${Date.now()}`
+      setAttrPool((prev) => ({
+        ...prev,
+        [newId]: {
+          ...attrForm,
+          id: newId,
+          displayOrder: Number(attrForm.displayOrder),
+        } as Attribute,
+      }))
+      if (attrsCat) {
+        setCatAttrIds((prev) => ({
+          ...prev,
+          [attrsCat.id]: [...(prev[attrsCat.id] ?? []), newId],
+        }))
+      }
     }
     setEditingAttr(null)
     setAttrForm(emptyAttrForm)
+  }
+
+  const openEditCatAttr = (catId: string, attrId: string) => {
+    const eff = getEffectiveAttr(catId, attrId)
+    setEditingAttr({ id: attrId })
+    setAttrForm({
+      ...eff,
+      displayOrder: String(eff.displayOrder),
+    } as AttrFormState)
+  }
+
+  const handleSaveCatAttrOverride = (catId: string, attrId: string) => {
+    if (!attrForm.name || !attrForm.title) {
+      alert('Name and Title are required')
+      return
+    }
+    const base = attrPool[attrId]
+    const override: AttrOverride = {}
+    for (const key of Object.keys(attrForm) as Array<keyof AttrFormState>) {
+      const fv = attrForm[key]
+      const bv =
+        key === 'displayOrder'
+          ? String(base[key as keyof Attribute] ?? '')
+          : (base[key as keyof Attribute] ?? '')
+      if (String(fv) !== String(bv))
+        (override as Record<string, unknown>)[key] = fv
+    }
+    setCatAttrOverrides((prev) => ({
+      ...prev,
+      [catId]: { ...(prev[catId] ?? {}), [attrId]: override },
+    }))
+    setEditingAttr(null)
+    setAttrForm(emptyAttrForm)
+  }
+
+  const revertCatAttrOverride = (catId: string, attrId: string) => {
+    setCatAttrOverrides((prev) => {
+      const next = { ...(prev[catId] ?? {}) }
+      delete next[attrId]
+      return { ...prev, [catId]: next }
+    })
+  }
+
+  const handleAttrAssignment = (
+    attrId: string,
+    selectedCatIds: Array<string>,
+  ) => {
+    setCatAttrIds((prev) => {
+      const next = { ...prev }
+      for (const cat of categories) {
+        const curr = next[cat.id] ?? []
+        const has = curr.includes(attrId)
+        const wants = selectedCatIds.includes(cat.id)
+        if (wants && !has) next[cat.id] = [...curr, attrId]
+        if (!wants && has) next[cat.id] = curr.filter((id) => id !== attrId)
+      }
+      return next
+    })
   }
 
   const openEditAttr = (attr: Attribute) => {
@@ -3108,7 +3495,21 @@ function CategoryDefinitions() {
             <Button
               variant="destructive"
               onClick={() => {
-                setAttrs((a) => a.filter((x) => x.id !== deletingAttr?.id))
+                if (!deletingAttr) return
+                const id = deletingAttr.id
+                setAttrPool((prev) => {
+                  const n = { ...prev }
+                  delete n[id]
+                  return n
+                })
+                setCatAttrIds((prev) =>
+                  Object.fromEntries(
+                    Object.entries(prev).map(([cid, ids]) => [
+                      cid,
+                      ids.filter((x) => x !== id),
+                    ]),
+                  ),
+                )
                 setDeletingAttr(null)
               }}
             >
@@ -3197,14 +3598,14 @@ function CategoryDefinitions() {
           <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
             <DialogTitle>Attributes — {attrsCat?.name}</DialogTitle>
             <DialogDescription>
-              {attrs.length} attributes configured
+              {currentCatAttrs.length} attributes configured
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Manage attributes for this category. Attributes define the
-                fields shown when listing items.
+                Manage attributes for this subcategory. Edit to override global
+                defaults — changes apply only here.
               </p>
               <Button
                 size="sm"
@@ -3253,16 +3654,61 @@ function CategoryDefinitions() {
               </div>
             )}
 
-            <div
-              ref={attrTableRef}
-              className="rounded-md border overflow-x-auto"
-            >
+            <div className="rounded-md border overflow-x-auto">
               <Table>
                 <TableHeader className="bg-muted sticky top-0 z-10">
                   <TableRow>
-                    <AttrSortHead col="name" label="Name" />
+                    <TableHead>
+                      <button
+                        onClick={() => {
+                          if (attrSortCol === 'name')
+                            setAttrSortDir((d) =>
+                              d === 'asc' ? 'desc' : 'asc',
+                            )
+                          else {
+                            setAttrSortCol('name')
+                            setAttrSortDir('asc')
+                          }
+                        }}
+                        className="flex items-center gap-1 hover:text-foreground transition-colors font-medium"
+                      >
+                        Name{' '}
+                        <ArrowUpDown
+                          className={cn(
+                            'h-4 w-4',
+                            attrSortCol === 'name'
+                              ? 'text-foreground'
+                              : 'text-muted-foreground',
+                          )}
+                        />
+                      </button>
+                    </TableHead>
                     <TableHead>Editor</TableHead>
-                    <AttrSortHead col="displayOrder" label="Order" />
+                    <TableHead>
+                      <button
+                        onClick={() => {
+                          if (attrSortCol === 'displayOrder')
+                            setAttrSortDir((d) =>
+                              d === 'asc' ? 'desc' : 'asc',
+                            )
+                          else {
+                            setAttrSortCol('displayOrder')
+                            setAttrSortDir('asc')
+                          }
+                        }}
+                        className="flex items-center gap-1 hover:text-foreground transition-colors font-medium"
+                      >
+                        Order{' '}
+                        <ArrowUpDown
+                          className={cn(
+                            'h-4 w-4',
+                            attrSortCol === 'displayOrder'
+                              ? 'text-foreground'
+                              : 'text-muted-foreground',
+                          )}
+                        />
+                      </button>
+                    </TableHead>
                     <TableHead>Flags</TableHead>
                     <TableHead className="sticky right-0 bg-muted text-right whitespace-nowrap w-px after:absolute after:inset-y-0 after:left-0 after:w-px after:bg-border">
                       Actions
@@ -3270,166 +3716,258 @@ function CategoryDefinitions() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedAttrs.map((attr) => (
-                    <React.Fragment key={attr.id}>
-                      <TableRow
-                        className={cn(
-                          editingAttr &&
-                            'id' in editingAttr &&
-                            editingAttr.id === attr.id
-                            ? 'bg-amber-50 dark:bg-amber-900/10'
-                            : '',
-                        )}
+                  {sortedCatAttrs.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className="text-center h-24 text-muted-foreground"
                       >
-                        <TableCell>
-                          <span className="font-medium text-sm">
-                            {attr.name}
-                          </span>
-                          {attr.isObsolete && (
-                            <span className="ml-2 text-xs text-muted-foreground italic">
-                              (obsolete)
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{attr.editor}</Badge>
-                        </TableCell>
-                        <TableCell className="tabular-nums text-muted-foreground">
-                          {attr.displayOrder}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1 flex-wrap">
-                            {attr.isOptional && (
-                              <Badge variant="secondary" className="text-xs">
-                                Optional
-                              </Badge>
+                        No attributes configured for this subcategory
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    sortedCatAttrs.map((attr) => {
+                      const isEditingThis = !!(
+                        editingAttr &&
+                        'id' in editingAttr &&
+                        editingAttr.id === attr.id
+                      )
+                      const overridden = attrsCat
+                        ? hasOverride(attrsCat.id, attr.id)
+                        : false
+                      return (
+                        <React.Fragment key={attr.id}>
+                          <TableRow
+                            className={cn(
+                              isEditingThis
+                                ? 'bg-amber-50 dark:bg-amber-900/10'
+                                : '',
                             )}
-                            {attr.isSpecification && (
-                              <Badge variant="secondary" className="text-xs">
-                                Spec
-                              </Badge>
-                            )}
-                            {attr.notInDescription && (
-                              <Badge variant="secondary" className="text-xs">
-                                No Desc
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="sticky right-0 bg-background text-right whitespace-nowrap w-px after:absolute after:inset-y-0 after:left-0 after:w-px after:bg-border">
-                          <TooltipProvider delayDuration={600}>
-                            <div className="flex items-center justify-end gap-1">
-                              <Tooltip delayDuration={700}>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      editingAttr &&
-                                      'id' in editingAttr &&
-                                      editingAttr.id === attr.id
-                                        ? (setEditingAttr(null),
-                                          setAttrForm(emptyAttrForm))
-                                        : openEditAttr(attr)
-                                    }
-                                    className={cn(
-                                      'h-6 w-6 p-0',
-                                      editingAttr &&
-                                        'id' in editingAttr &&
-                                        editingAttr.id === attr.id
-                                        ? 'text-amber-600 bg-amber-100'
-                                        : '',
-                                    )}
-                                  >
-                                    <Edit2 className="h-3 w-3" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {editingAttr &&
-                                  'id' in editingAttr &&
-                                  editingAttr.id === attr.id
-                                    ? 'Collapse'
-                                    : 'Edit'}
-                                </TooltipContent>
-                              </Tooltip>
-                              <Tooltip delayDuration={700}>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    onClick={() => setDeletingAttr(attr)}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Delete</TooltipContent>
-                              </Tooltip>
-                              <Tooltip delayDuration={700}>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0"
-                                  >
-                                    <MoveUp className="h-3 w-3" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Move Up</TooltipContent>
-                              </Tooltip>
-                              <Tooltip delayDuration={700}>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0"
-                                  >
-                                    <MoveDown className="h-3 w-3" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Move Down</TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </TooltipProvider>
-                        </TableCell>
-                      </TableRow>
-                      <TableRow className="border-0">
-                        <TableCell colSpan={5} className="p-0 border-0">
-                          <AnimateExpand
-                            open={
-                              !!(
-                                editingAttr &&
-                                'id' in editingAttr &&
-                                editingAttr.id === attr.id
-                              )
-                            }
                           >
-                            <div className="bg-amber-50/60 dark:bg-amber-900/10 px-4 py-4 border-b-2 border-amber-200 dark:border-amber-700/50">
-                              <AttributeForm
-                                form={attrForm}
-                                setForm={setAttrForm}
-                              />
-                              <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-amber-200 dark:border-amber-700/40">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setEditingAttr(null)
-                                    setAttrForm(emptyAttrForm)
-                                  }}
-                                >
-                                  Cancel
-                                </Button>
-                                <Button size="sm" onClick={handleSaveAttr}>
-                                  Save Attribute
-                                </Button>
+                            <TableCell>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium text-sm">
+                                  {attr.name}
+                                </span>
+                                {attr.isObsolete && (
+                                  <span className="text-xs text-muted-foreground italic">
+                                    (obsolete)
+                                  </span>
+                                )}
+                                {overridden && (
+                                  <span className="inline-flex items-center text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-700 px-1.5 py-0.5 rounded-full font-medium">
+                                    Overridden
+                                  </span>
+                                )}
                               </div>
-                            </div>
-                          </AnimateExpand>
-                        </TableCell>
-                      </TableRow>
-                    </React.Fragment>
-                  ))}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{attr.editor}</Badge>
+                            </TableCell>
+                            <TableCell className="tabular-nums text-muted-foreground">
+                              {attr.displayOrder}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1 flex-wrap">
+                                {attr.isOptional && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
+                                    Optional
+                                  </Badge>
+                                )}
+                                {attr.isSpecification && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
+                                    Spec
+                                  </Badge>
+                                )}
+                                {attr.notInDescription && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
+                                    No Desc
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="sticky right-0 bg-background text-right whitespace-nowrap w-px after:absolute after:inset-y-0 after:left-0 after:w-px after:bg-border">
+                              <TooltipProvider delayDuration={600}>
+                                <div className="flex items-center justify-end gap-1">
+                                  {overridden && attrsCat && (
+                                    <Tooltip delayDuration={700}>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-100"
+                                          onClick={() =>
+                                            revertCatAttrOverride(
+                                              attrsCat.id,
+                                              attr.id,
+                                            )
+                                          }
+                                        >
+                                          <RotateCcw className="h-3 w-3" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        Revert all to defaults
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                  <Tooltip delayDuration={700}>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                          isEditingThis
+                                            ? (setEditingAttr(null),
+                                              setAttrForm(emptyAttrForm))
+                                            : attrsCat &&
+                                              openEditCatAttr(
+                                                attrsCat.id,
+                                                attr.id,
+                                              )
+                                        }
+                                        className={cn(
+                                          'h-6 w-6 p-0',
+                                          isEditingThis
+                                            ? 'text-amber-600 bg-amber-100'
+                                            : '',
+                                        )}
+                                      >
+                                        <Edit2 className="h-3 w-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {isEditingThis
+                                        ? 'Collapse'
+                                        : overridden
+                                          ? 'Edit Override'
+                                          : 'Override'}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip delayDuration={700}>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        onClick={() => setDeletingAttr(attr)}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      Remove from subcategory
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip delayDuration={700}>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0"
+                                      >
+                                        <MoveUp className="h-3 w-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Move Up</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip delayDuration={700}>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0"
+                                      >
+                                        <MoveDown className="h-3 w-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Move Down</TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              </TooltipProvider>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow className="border-0">
+                            <TableCell colSpan={5} className="p-0 border-0">
+                              <AnimateExpand open={isEditingThis}>
+                                <div className="bg-amber-50/60 dark:bg-amber-900/10 px-4 py-4 border-b-2 border-amber-200 dark:border-amber-700/50">
+                                  <div className="flex items-center gap-2 mb-3 p-2 bg-muted/60 rounded-md border">
+                                    <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                    <span className="text-xs text-muted-foreground">
+                                      {overridden
+                                        ? 'Editing override — changes apply only to this subcategory.'
+                                        : 'Saving will create a subcategory-level override. Global defaults unchanged.'}
+                                    </span>
+                                  </div>
+                                  <AttributeForm
+                                    form={attrForm}
+                                    setForm={setAttrForm}
+                                    baseForm={(() => {
+                                      const base = attrPool[attr.id]
+                                      return base
+                                        ? ({
+                                            ...base,
+                                            displayOrder: String(
+                                              base.displayOrder,
+                                            ),
+                                          } as AttrFormState)
+                                        : undefined
+                                    })()}
+                                    onRevertField={(field) => {
+                                      const base = attrPool[attr.id]
+                                      if (!base) return
+                                      const baseVal =
+                                        field === 'displayOrder'
+                                          ? String(base.displayOrder)
+                                          : (base[field as keyof Attribute] ??
+                                            emptyAttrForm[field])
+                                      setAttrForm((prev) => ({
+                                        ...prev,
+                                        [field]: baseVal,
+                                      }))
+                                    }}
+                                  />
+                                  <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-amber-200 dark:border-amber-700/40">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setEditingAttr(null)
+                                        setAttrForm(emptyAttrForm)
+                                      }}
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      onClick={() =>
+                                        attrsCat &&
+                                        handleSaveCatAttrOverride(
+                                          attrsCat.id,
+                                          attr.id,
+                                        )
+                                      }
+                                    >
+                                      Save Override
+                                    </Button>
+                                  </div>
+                                </div>
+                              </AnimateExpand>
+                            </TableCell>
+                          </TableRow>
+                        </React.Fragment>
+                      )
+                    })
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -3448,7 +3986,6 @@ function CategoryDefinitions() {
           </div>
         </DialogContent>
       </Dialog>
-
       {/* ── All Attributes Modal ── */}
       <Dialog
         open={showAllAttrs}
@@ -3457,6 +3994,7 @@ function CategoryDefinitions() {
             setShowAllAttrs(false)
             setEditingAttr(null)
             setAttrForm(emptyAttrForm)
+            setAssigningAttr(null)
           }
         }}
       >
@@ -3464,14 +4002,14 @@ function CategoryDefinitions() {
           <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
             <DialogTitle>All Attributes</DialogTitle>
             <DialogDescription>
-              {attrs.length} attributes across all categories
+              {allAttrs.length} attributes in the global pool
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                All available attributes that can be assigned to category
-                definitions.
+                Global attribute pool. Use the subcategory column to assign
+                attributes across subcategories.
               </p>
               <Button
                 size="sm"
@@ -3520,159 +4058,281 @@ function CategoryDefinitions() {
               </div>
             )}
 
-            <div
-              ref={allAttrTableRef}
-              className="rounded-md border overflow-x-auto"
-            >
+            <div className="rounded-md border overflow-x-auto">
               <Table>
                 <TableHeader className="bg-muted sticky top-0 z-10">
                   <TableRow>
-                    <AttrSortHead col="name" label="Name" />
+                    <TableHead>
+                      <button
+                        onClick={() => {
+                          if (attrSortCol === 'name')
+                            setAttrSortDir((d) =>
+                              d === 'asc' ? 'desc' : 'asc',
+                            )
+                          else {
+                            setAttrSortCol('name')
+                            setAttrSortDir('asc')
+                          }
+                        }}
+                        className="flex items-center gap-1 hover:text-foreground transition-colors font-medium"
+                      >
+                        Name{' '}
+                        <ArrowUpDown
+                          className={cn(
+                            'h-4 w-4',
+                            attrSortCol === 'name'
+                              ? 'text-foreground'
+                              : 'text-muted-foreground',
+                          )}
+                        />
+                      </button>
+                    </TableHead>
                     <TableHead>Editor</TableHead>
-                    <AttrSortHead col="displayOrder" label="Order" />
-                    <TableHead>Flags</TableHead>
+                    <TableHead>
+                      <button
+                        onClick={() => {
+                          if (attrSortCol === 'displayOrder')
+                            setAttrSortDir((d) =>
+                              d === 'asc' ? 'desc' : 'asc',
+                            )
+                          else {
+                            setAttrSortCol('displayOrder')
+                            setAttrSortDir('asc')
+                          }
+                        }}
+                        className="flex items-center gap-1 hover:text-foreground transition-colors font-medium"
+                      >
+                        Order{' '}
+                        <ArrowUpDown
+                          className={cn(
+                            'h-4 w-4',
+                            attrSortCol === 'displayOrder'
+                              ? 'text-foreground'
+                              : 'text-muted-foreground',
+                          )}
+                        />
+                      </button>
+                    </TableHead>
+                    <TableHead>Subcategories</TableHead>
                     <TableHead className="sticky right-0 bg-muted text-right whitespace-nowrap w-px after:absolute after:inset-y-0 after:left-0 after:w-px after:bg-border">
                       Actions
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedAttrs.map((attr) => (
-                    <React.Fragment key={attr.id}>
-                      <TableRow
-                        className={cn(
-                          editingAttr &&
-                            'id' in editingAttr &&
-                            editingAttr.id === attr.id
-                            ? 'bg-amber-50 dark:bg-amber-900/10'
-                            : '',
-                        )}
-                      >
-                        <TableCell>
-                          <span className="font-medium text-sm">
-                            {attr.name}
-                          </span>
-                          {attr.isObsolete && (
-                            <span className="ml-2 text-xs text-muted-foreground italic">
-                              (obsolete)
-                            </span>
+                  {sortedAllAttrs.map((attr) => {
+                    const assignedCatIds = Object.entries(catAttrIds)
+                      .filter(([, ids]) => ids.includes(attr.id))
+                      .map(([cid]) => cid)
+                    const isEditingThis = !!(
+                      editingAttr &&
+                      'id' in editingAttr &&
+                      editingAttr.id === attr.id
+                    )
+                    const isAssigningThis = assigningAttr === attr.id
+                    return (
+                      <React.Fragment key={attr.id}>
+                        <TableRow
+                          className={cn(
+                            isEditingThis
+                              ? 'bg-amber-50 dark:bg-amber-900/10'
+                              : '',
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{attr.editor}</Badge>
-                        </TableCell>
-                        <TableCell className="tabular-nums text-muted-foreground">
-                          {attr.displayOrder}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1 flex-wrap">
-                            {attr.isOptional && (
-                              <Badge variant="secondary" className="text-xs">
-                                Optional
-                              </Badge>
+                        >
+                          <TableCell>
+                            <span className="font-medium text-sm">
+                              {attr.name}
+                            </span>
+                            {attr.isObsolete && (
+                              <span className="ml-2 text-xs text-muted-foreground italic">
+                                (obsolete)
+                              </span>
                             )}
-                            {attr.isSpecification && (
-                              <Badge variant="secondary" className="text-xs">
-                                Spec
-                              </Badge>
-                            )}
-                            {attr.notInDescription && (
-                              <Badge variant="secondary" className="text-xs">
-                                No Desc
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="sticky right-0 bg-background text-right whitespace-nowrap w-px after:absolute after:inset-y-0 after:left-0 after:w-px after:bg-border">
-                          <TooltipProvider delayDuration={600}>
-                            <div className="flex items-center justify-end gap-1">
-                              <Tooltip delayDuration={700}>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      editingAttr &&
-                                      'id' in editingAttr &&
-                                      editingAttr.id === attr.id
-                                        ? (setEditingAttr(null),
-                                          setAttrForm(emptyAttrForm))
-                                        : openEditAttr(attr)
-                                    }
-                                    className={cn(
-                                      'h-6 w-6 p-0',
-                                      editingAttr &&
-                                        'id' in editingAttr &&
-                                        editingAttr.id === attr.id
-                                        ? 'text-amber-600 bg-amber-100'
-                                        : '',
-                                    )}
-                                  >
-                                    <Edit2 className="h-3 w-3" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {editingAttr &&
-                                  'id' in editingAttr &&
-                                  editingAttr.id === attr.id
-                                    ? 'Collapse'
-                                    : 'Edit'}
-                                </TooltipContent>
-                              </Tooltip>
-                              <Tooltip delayDuration={700}>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    onClick={() => setDeletingAttr(attr)}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Delete</TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </TooltipProvider>
-                        </TableCell>
-                      </TableRow>
-                      <TableRow className="border-0">
-                        <TableCell colSpan={6} className="p-0 border-0">
-                          <AnimateExpand
-                            open={
-                              !!(
-                                editingAttr &&
-                                'id' in editingAttr &&
-                                editingAttr.id === attr.id
-                              )
-                            }
-                          >
-                            <div className="bg-amber-50/60 dark:bg-amber-900/10 px-4 py-4 border-b-2 border-amber-200 dark:border-amber-700/50">
-                              <AttributeForm
-                                form={attrForm}
-                                setForm={setAttrForm}
-                              />
-                              <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-amber-200 dark:border-amber-700/40">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setEditingAttr(null)
-                                    setAttrForm(emptyAttrForm)
-                                  }}
-                                >
-                                  Cancel
-                                </Button>
-                                <Button size="sm" onClick={handleSaveAttr}>
-                                  Save Attribute
-                                </Button>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{attr.editor}</Badge>
+                          </TableCell>
+                          <TableCell className="tabular-nums text-muted-foreground">
+                            {attr.displayOrder}
+                          </TableCell>
+                          <TableCell>
+                            <button
+                              onClick={() =>
+                                setAssigningAttr(
+                                  isAssigningThis ? null : attr.id,
+                                )
+                              }
+                              className={cn(
+                                'text-xs px-2 py-1 rounded-md border transition-colors',
+                                isAssigningThis
+                                  ? 'bg-primary text-primary-foreground border-primary'
+                                  : 'bg-muted hover:bg-muted/80 border-transparent text-muted-foreground',
+                              )}
+                            >
+                              {assignedCatIds.length} subcategor
+                              {assignedCatIds.length === 1 ? 'y' : 'ies'}
+                            </button>
+                          </TableCell>
+                          <TableCell className="sticky right-0 bg-background text-right whitespace-nowrap w-px after:absolute after:inset-y-0 after:left-0 after:w-px after:bg-border">
+                            <TooltipProvider delayDuration={600}>
+                              <div className="flex items-center justify-end gap-1">
+                                <Tooltip delayDuration={700}>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        isEditingThis
+                                          ? (setEditingAttr(null),
+                                            setAttrForm(emptyAttrForm))
+                                          : openEditAttr(attr)
+                                      }
+                                      className={cn(
+                                        'h-6 w-6 p-0',
+                                        isEditingThis
+                                          ? 'text-amber-600 bg-amber-100'
+                                          : '',
+                                      )}
+                                    >
+                                      <Edit2 className="h-3 w-3" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {isEditingThis ? 'Collapse' : 'Edit'}
+                                  </TooltipContent>
+                                </Tooltip>
+                                <Tooltip delayDuration={700}>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                      onClick={() => setDeletingAttr(attr)}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Delete</TooltipContent>
+                                </Tooltip>
                               </div>
-                            </div>
-                          </AnimateExpand>
-                        </TableCell>
-                      </TableRow>
-                    </React.Fragment>
-                  ))}
+                            </TooltipProvider>
+                          </TableCell>
+                        </TableRow>
+                        <TableRow className="border-0">
+                          <TableCell colSpan={5} className="p-0 border-0">
+                            <AnimateExpand open={isEditingThis}>
+                              <div className="bg-amber-50/60 dark:bg-amber-900/10 px-4 py-4 border-b-2 border-amber-200 dark:border-amber-700/50">
+                                <AttributeForm
+                                  form={attrForm}
+                                  setForm={setAttrForm}
+                                />
+                                <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-amber-200 dark:border-amber-700/40">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingAttr(null)
+                                      setAttrForm(emptyAttrForm)
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button size="sm" onClick={handleSaveAttr}>
+                                    Save Attribute
+                                  </Button>
+                                </div>
+                              </div>
+                            </AnimateExpand>
+                          </TableCell>
+                        </TableRow>
+                        <TableRow className="border-0">
+                          <TableCell colSpan={5} className="p-0 border-0">
+                            <AnimateExpand open={isAssigningThis}>
+                              <div className="bg-blue-50/60 dark:bg-blue-900/10 px-4 py-4 border-b-2 border-blue-200 dark:border-blue-700/50">
+                                <p className="text-sm font-semibold mb-1">
+                                  Assign to Subcategories
+                                </p>
+                                <p className="text-xs text-muted-foreground mb-3">
+                                  Select which subcategories use this attribute.
+                                  Individual subcategories can still override
+                                  settings.
+                                </p>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
+                                  {cats.map((cat) => {
+                                    const checked = assignedCatIds.includes(
+                                      cat.id,
+                                    )
+                                    return (
+                                      <label
+                                        key={cat.id}
+                                        className={cn(
+                                          'flex items-center gap-2 text-xs px-2 py-1.5 rounded-md cursor-pointer border transition-colors',
+                                          checked
+                                            ? 'bg-primary/10 border-primary/30 text-foreground'
+                                            : 'bg-background border-border text-muted-foreground hover:border-primary/30',
+                                        )}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={checked}
+                                          onChange={(e) => {
+                                            const next = e.target.checked
+                                              ? [...assignedCatIds, cat.id]
+                                              : assignedCatIds.filter(
+                                                  (id) => id !== cat.id,
+                                                )
+                                            handleAttrAssignment(attr.id, next)
+                                          }}
+                                          className="h-3 w-3 rounded"
+                                        />
+                                        <span className="truncate">
+                                          {cat.name}
+                                        </span>
+                                      </label>
+                                    )
+                                  })}
+                                </div>
+                                <div className="flex items-center justify-between mt-3 pt-3 border-t border-blue-200 dark:border-blue-700/50">
+                                  <div className="flex gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 text-xs"
+                                      onClick={() =>
+                                        handleAttrAssignment(
+                                          attr.id,
+                                          cats.map((c) => c.id),
+                                        )
+                                      }
+                                    >
+                                      Select All
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 text-xs"
+                                      onClick={() =>
+                                        handleAttrAssignment(attr.id, [])
+                                      }
+                                    >
+                                      Clear All
+                                    </Button>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    className="h-7 text-xs"
+                                    onClick={() => setAssigningAttr(null)}
+                                  >
+                                    Done
+                                  </Button>
+                                </div>
+                              </div>
+                            </AnimateExpand>
+                          </TableCell>
+                        </TableRow>
+                      </React.Fragment>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -3684,6 +4344,7 @@ function CategoryDefinitions() {
                 setShowAllAttrs(false)
                 setEditingAttr(null)
                 setAttrForm(emptyAttrForm)
+                setAssigningAttr(null)
               }}
             >
               Close
@@ -3691,7 +4352,6 @@ function CategoryDefinitions() {
           </div>
         </DialogContent>
       </Dialog>
-
       {/* ── Change Log Modal ── */}
       <Dialog
         open={!!changeLogCat}
