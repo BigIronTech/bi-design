@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { loadDb, saveDb, seedDbIfEmpty, type DbState } from './category-db'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
@@ -27,8 +28,6 @@ import {
   User,
   X,
 } from 'lucide-react'
-import { loadDb, saveDb, seedDbIfEmpty } from './category-db'
-import type { DbState } from './category-db'
 import { cn } from '@/lib/utils'
 import { AppSidebar } from '@/components/app-sidebar'
 import {
@@ -99,8 +98,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-export const Route = createFileRoute('/category-definitions')({
-  component: CategoryDefinitions,
+export const Route = createFileRoute('/category-definitions-new')({
+  component: CategoryDefinitionsNew,
 })
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -221,7 +220,12 @@ interface CategoryDefinition {
     parent2: string
     parentDisplayOrder: string
   }
-  industries: { industry1: string; industry2: string }
+  industries: {
+    industry1: string
+    industry2: string
+    industry3: string
+    industry4: string
+  }
 }
 
 interface AttrFormState {
@@ -280,7 +284,12 @@ interface CatFormState {
     parent2: string
     parentDisplayOrder: string
   }
-  industries: { industry1: string; industry2: string }
+  industries: {
+    industry1: string
+    industry2: string
+    industry3: string
+    industry4: string
+  }
   categoryDisplayOrder: string
 }
 
@@ -1085,7 +1094,12 @@ function buildCategory(rawTitle: string, idx: number): CategoryDefinition {
       parent2: '',
       parentDisplayOrder: '0',
     },
-    industries: { industry1: industry, industry2: industry },
+    industries: {
+      industry1: industry,
+      industry2: '',
+      industry3: '',
+      industry4: '',
+    },
   }
 }
 
@@ -1162,7 +1176,7 @@ const emptyCategoryForm: CatFormState = {
     parent2: '',
     parentDisplayOrder: '',
   },
-  industries: { industry1: '', industry2: '' },
+  industries: { industry1: '', industry2: '', industry3: '', industry4: '' },
   categoryDisplayOrder: '',
 }
 
@@ -1544,18 +1558,8 @@ function CategoryForm({
             </p>
           </div>
         </div>
-        {/* Row 3: Auction Order + Category Display Order + Auction Extension */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="space-y-1.5">
-            <Label>Auction Order</Label>
-            <input
-              type="number"
-              value={form.auctionOrder}
-              onChange={(e) => f('auctionOrder', e.target.value)}
-              placeholder="e.g. 1000"
-              className={inputCls}
-            />
-          </div>
+        {/* Row 3: Category Display Order + Auction Time Extension */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label>Category Display Order</Label>
             <input
@@ -1567,7 +1571,7 @@ function CategoryForm({
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Auction Extension</Label>
+            <Label>Auction Time Extension</Label>
             <div className="relative">
               <select
                 value={form.auctionExtension}
@@ -1584,8 +1588,8 @@ function CategoryForm({
             </div>
           </div>
         </div>
-        {/* Row 4: Priority + Vertical + Effective Date */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Row 4: Priority + Effective Date */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label>Priority</Label>
             <div className="relative">
@@ -1604,24 +1608,6 @@ function CategoryForm({
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>Vertical</Label>
-            <div className="relative">
-              <select
-                value={form.vertical}
-                onChange={(e) => f('vertical', e.target.value)}
-                className={selectCls}
-              >
-                <option value="">Select vertical...</option>
-                {VERTICALS.map((v) => (
-                  <option key={v} value={v}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            </div>
-          </div>
-          <div className="space-y-1.5">
             <Label>Effective Date</Label>
             <input
               type="date"
@@ -1631,164 +1617,52 @@ function CategoryForm({
             />
           </div>
         </div>
-        {/* Row 5: Legacy Title + Is Obsolete */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-          <div className="sm:col-span-2 space-y-1.5">
-            <Label>Legacy Title</Label>
-            <input
-              value={form.legacyTitle}
-              onChange={(e) => f('legacyTitle', e.target.value)}
-              placeholder="e.g. Farm - Tractors"
-              className={inputCls}
-            />
-          </div>
-          <div className="flex items-center gap-2 pb-1">
-            <input
-              type="checkbox"
-              id="isObsolete"
-              checked={!!form.isObsolete}
-              onChange={(e) => f('isObsolete', e.target.checked)}
-              className="h-4 w-4 rounded border-input"
-            />
-            <Label htmlFor="isObsolete" className="cursor-pointer font-normal">
-              Is obsolete?
-            </Label>
-          </div>
-        </div>
-      </AccordionSection>
-
-      <AccordionSection
-        id="heading"
-        title="Heading"
-        subtitle="Controls grouping in the dropdown on the sales site."
-        faIcon="fa-solid fa-table"
-        openSection={openSection}
-        onToggle={onToggleSection}
-      >
-        <div className="grid grid-cols-3 gap-3">
-          <div className="col-span-2 space-y-1.5">
-            <Label>Level 1</Label>
-            <input
-              value={form.heading.level1}
-              onChange={(e) => fh('level1', e.target.value)}
-              placeholder="e.g. Asphalt / Paving Equipment"
-              className={inputCls}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Display Order</Label>
-            <input
-              type="number"
-              value={form.heading.displayOrder1}
-              onChange={(e) => fh('displayOrder1', e.target.value)}
-              placeholder="230"
-              className={inputCls}
-            />
-          </div>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="col-span-2 space-y-1.5">
-            <Label>Level 2</Label>
-            <input
-              value={form.heading.level2}
-              onChange={(e) => fh('level2', e.target.value)}
-              placeholder="e.g. Burners"
-              className={inputCls}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Display Order</Label>
-            <input
-              type="number"
-              value={form.heading.displayOrder2}
-              onChange={(e) => fh('displayOrder2', e.target.value)}
-              placeholder="100"
-              className={inputCls}
-            />
-          </div>
-        </div>
-      </AccordionSection>
-
-      <AccordionSection
-        id="parent"
-        title="Parent Configuration"
-        subtitle="Used for auction site display, grouping and ordering."
-        faIcon="fa-solid fa-sitemap"
-        openSection={openSection}
-        onToggle={onToggleSection}
-      >
-        <div className="grid grid-cols-3 gap-3">
-          <div className="col-span-2 space-y-1.5">
-            <Label>Display Name</Label>
-            <input
-              value={form.parentConfig.displayName}
-              onChange={(e) => fp('displayName', e.target.value)}
-              placeholder="Display Name"
-              className={inputCls}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Display Order</Label>
-            <input
-              type="number"
-              value={form.parentConfig.parentDisplayOrder}
-              onChange={(e) => fp('parentDisplayOrder', e.target.value)}
-              placeholder="0"
-              className={inputCls}
-            />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label>Parent 1</Label>
-            <input
-              value={form.parentConfig.parent1}
-              onChange={(e) => fp('parent1', e.target.value)}
-              placeholder="First level category"
-              className={inputCls}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Parent 2</Label>
-            <input
-              value={form.parentConfig.parent2}
-              onChange={(e) => fp('parent2', e.target.value)}
-              placeholder="Second level category"
-              className={inputCls}
-            />
-          </div>
+        {/* Row 5: Is Obsolete */}
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="isObsolete"
+            checked={!!form.isObsolete}
+            onChange={(e) => f('isObsolete', e.target.checked)}
+            className="h-4 w-4 rounded border-input"
+          />
+          <Label htmlFor="isObsolete" className="cursor-pointer font-normal">
+            Is obsolete?
+          </Label>
         </div>
       </AccordionSection>
 
       <AccordionSection
         id="industries"
         title="Industries"
-        subtitle="A subcategory may belong to 1 or 2 industries."
+        subtitle="A subcategory may belong to up to 4 industries."
         faIcon="fa-solid fa-industry"
         openSection={openSection}
         onToggle={onToggleSection}
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {['industry1', 'industry2'].map((key, i) => (
-            <div key={key} className="space-y-1.5">
-              <Label>Industry {i + 1}</Label>
-              <div className="relative">
-                <select
-                  value={(form.industries as Record<string, string>)[key]}
-                  onChange={(e) => fi(key, e.target.value)}
-                  className={selectCls}
-                >
-                  <option value="">None</option>
-                  {INDUSTRIES.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          {(['industry1', 'industry2', 'industry3', 'industry4'] as const).map(
+            (key, i) => (
+              <div key={key} className="space-y-1.5">
+                <Label>Industry {i + 1}</Label>
+                <div className="relative">
+                  <select
+                    value={(form.industries as Record<string, string>)[key]}
+                    onChange={(e) => fi(key, e.target.value)}
+                    className={selectCls}
+                  >
+                    <option value="">None</option>
+                    {INDUSTRIES.map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                </div>
               </div>
-            </div>
-          ))}
+            ),
+          )}
         </div>
       </AccordionSection>
     </div>
@@ -2083,7 +1957,7 @@ function AttributeForm({
               onRevertField={onRevertField}
             >
               <input
-                value={form[k]}
+                value={form[k] as string}
                 onChange={(e) => f(k, e.target.value)}
                 className={inputCls}
               />
@@ -2325,7 +2199,7 @@ function DashboardWrapper({ children }: { children: React.ReactNode }) {
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
-                <BreadcrumbPage>Category Definitions</BreadcrumbPage>
+                <BreadcrumbPage>NEW Category Definitions</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -2379,7 +2253,7 @@ function DashboardWrapper({ children }: { children: React.ReactNode }) {
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
-function CategoryDefinitions() {
+function CategoryDefinitionsNew() {
   // Load Font Awesome
   React.useEffect(() => {
     if (!document.getElementById('fa-cdn')) {
@@ -2699,6 +2573,12 @@ function CategoryDefinitions() {
       auctionOrder: String(cat.auctionOrder),
       categoryDisplayOrder: String(cat.categoryDisplayOrder),
       effectiveDate: cat.effectiveDate || '',
+      industries: {
+        industry1: cat.industries.industry1,
+        industry2: cat.industries.industry2,
+        industry3: cat.industries.industry3 ?? '',
+        industry4: cat.industries.industry4 ?? '',
+      },
     })
   }
 

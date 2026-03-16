@@ -26,6 +26,7 @@ import { Route as FigmaRouteImport } from './routes/figma'
 import { Route as ElementsRouteImport } from './routes/elements'
 import { Route as DashboardsOldRouteImport } from './routes/dashboards-old'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CategoryDefinitionsNewRouteImport } from './routes/category-definitions-new'
 import { Route as CategoryDefinitionsRouteImport } from './routes/category-definitions'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -114,6 +115,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CategoryDefinitionsNewRoute = CategoryDefinitionsNewRouteImport.update({
+  id: '/category-definitions-new',
+  path: '/category-definitions-new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CategoryDefinitionsRoute = CategoryDefinitionsRouteImport.update({
   id: '/category-definitions',
   path: '/category-definitions',
@@ -128,6 +134,7 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/category-definitions': typeof CategoryDefinitionsRoute
+  '/category-definitions-new': typeof CategoryDefinitionsNewRoute
   '/dashboard': typeof DashboardRoute
   '/dashboards-old': typeof DashboardsOldRoute
   '/elements': typeof ElementsRoute
@@ -149,6 +156,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/category-definitions': typeof CategoryDefinitionsRoute
+  '/category-definitions-new': typeof CategoryDefinitionsNewRoute
   '/dashboard': typeof DashboardRoute
   '/dashboards-old': typeof DashboardsOldRoute
   '/elements': typeof ElementsRoute
@@ -171,6 +179,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/category-definitions': typeof CategoryDefinitionsRoute
+  '/category-definitions-new': typeof CategoryDefinitionsNewRoute
   '/dashboard': typeof DashboardRoute
   '/dashboards-old': typeof DashboardsOldRoute
   '/elements': typeof ElementsRoute
@@ -194,6 +203,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/category-definitions'
+    | '/category-definitions-new'
     | '/dashboard'
     | '/dashboards-old'
     | '/elements'
@@ -215,6 +225,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/category-definitions'
+    | '/category-definitions-new'
     | '/dashboard'
     | '/dashboards-old'
     | '/elements'
@@ -236,6 +247,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/category-definitions'
+    | '/category-definitions-new'
     | '/dashboard'
     | '/dashboards-old'
     | '/elements'
@@ -258,6 +270,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CategoryDefinitionsRoute: typeof CategoryDefinitionsRoute
+  CategoryDefinitionsNewRoute: typeof CategoryDefinitionsNewRoute
   DashboardRoute: typeof DashboardRoute
   DashboardsOldRoute: typeof DashboardsOldRoute
   ElementsRoute: typeof ElementsRoute
@@ -398,6 +411,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/category-definitions-new': {
+      id: '/category-definitions-new'
+      path: '/category-definitions-new'
+      fullPath: '/category-definitions-new'
+      preLoaderRoute: typeof CategoryDefinitionsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/category-definitions': {
       id: '/category-definitions'
       path: '/category-definitions'
@@ -418,6 +438,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CategoryDefinitionsRoute: CategoryDefinitionsRoute,
+  CategoryDefinitionsNewRoute: CategoryDefinitionsNewRoute,
   DashboardRoute: DashboardRoute,
   DashboardsOldRoute: DashboardsOldRoute,
   ElementsRoute: ElementsRoute,

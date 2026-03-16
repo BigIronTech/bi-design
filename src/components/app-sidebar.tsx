@@ -84,6 +84,11 @@ const navItems = [
         label: 'Category Definitions',
         to: '/category-definitions',
       },
+      {
+        id: 'category-definitions-new',
+        label: 'New Category Definitions',
+        to: '/category-definitions-new',
+      },
       { id: 'find-a-rep', label: 'Find My Sales Rep', to: '/find-a-rep' }, // ← NEW
     ],
   },
