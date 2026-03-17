@@ -221,7 +221,12 @@ interface CategoryDefinition {
     parent2: string
     parentDisplayOrder: string
   }
-  industries: { industry1: string; industry2: string }
+  industries: {
+    industry1: string
+    industry2: string
+    industry3: string
+    industry4: string
+  }
 }
 
 interface AttrFormState {
@@ -280,7 +285,12 @@ interface CatFormState {
     parent2: string
     parentDisplayOrder: string
   }
-  industries: { industry1: string; industry2: string }
+  industries: {
+    industry1: string
+    industry2: string
+    industry3: string
+    industry4: string
+  }
   categoryDisplayOrder: string
 }
 
@@ -1085,7 +1095,12 @@ function buildCategory(rawTitle: string, idx: number): CategoryDefinition {
       parent2: '',
       parentDisplayOrder: '0',
     },
-    industries: { industry1: industry, industry2: industry },
+    industries: {
+      industry1: industry,
+      industry2: industry,
+      industry3: '',
+      industry4: '',
+    },
   }
 }
 
@@ -1162,7 +1177,7 @@ const emptyCategoryForm: CatFormState = {
     parent2: '',
     parentDisplayOrder: '',
   },
-  industries: { industry1: '', industry2: '' },
+  industries: { industry1: '', industry2: '', industry3: '', industry4: '' },
   categoryDisplayOrder: '',
 }
 
@@ -2699,6 +2714,14 @@ function CategoryDefinitions() {
       auctionOrder: String(cat.auctionOrder),
       categoryDisplayOrder: String(cat.categoryDisplayOrder),
       effectiveDate: cat.effectiveDate || '',
+      industries: {
+        industry1: cat.industries.industry1,
+        industry2: cat.industries.industry2,
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        industry3: cat.industries.industry3 ?? '',
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        industry4: cat.industries.industry4 ?? '',
+      },
     })
   }
 

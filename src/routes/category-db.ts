@@ -62,7 +62,12 @@ export interface CategoryDefinition {
     parent2: string
     parentDisplayOrder: string
   }
-  industries: { industry1: string; industry2: string }
+  industries: {
+    industry1: string
+    industry2: string
+    industry3: string
+    industry4: string
+  }
 }
 
 export type AttrOverride = Partial<{
@@ -109,7 +114,7 @@ export interface DbState {
 }
 
 const DB_KEY = 'bigiron_category_definitions_v1'
-const SCHEMA_VERSION = 3
+const SCHEMA_VERSION = 2
 
 // ── Read ───────────────────────────────────────────────────────────────────────
 

@@ -1,5 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { loadDb, saveDb, seedDbIfEmpty, type DbState } from './category-db'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
@@ -28,6 +27,8 @@ import {
   User,
   X,
 } from 'lucide-react'
+import { loadDb, saveDb, seedDbIfEmpty } from './category-db'
+import type { DbState } from './category-db'
 import { cn } from '@/lib/utils'
 import { AppSidebar } from '@/components/app-sidebar'
 import {
@@ -1957,7 +1958,7 @@ function AttributeForm({
               onRevertField={onRevertField}
             >
               <input
-                value={form[k] as string}
+                value={form[k]}
                 onChange={(e) => f(k, e.target.value)}
                 className={inputCls}
               />
@@ -2576,7 +2577,9 @@ function CategoryDefinitionsNew() {
       industries: {
         industry1: cat.industries.industry1,
         industry2: cat.industries.industry2,
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         industry3: cat.industries.industry3 ?? '',
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         industry4: cat.industries.industry4 ?? '',
       },
     })
