@@ -13,6 +13,7 @@ import { Route as VoiceAndToneRouteImport } from './routes/voice-and-tone'
 import { Route as TypographyRouteImport } from './routes/typography'
 import { Route as TargetRouteImport } from './routes/target'
 import { Route as StandardsRouteImport } from './routes/standards'
+import { Route as SalesForecastingRouteImport } from './routes/sales-forecasting'
 import { Route as PersonasRouteImport } from './routes/personas'
 import { Route as PatternsRouteImport } from './routes/patterns'
 import { Route as MarketReportsRouteImport } from './routes/market-reports'
@@ -29,6 +30,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CategoryDefinitionsNewRouteImport } from './routes/category-definitions-new'
 import { Route as CategoryDefinitionsRouteImport } from './routes/category-definitions'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DashboardSalesForecastingRouteImport } from './routes/dashboard/sales-forecasting'
 
 const VoiceAndToneRoute = VoiceAndToneRouteImport.update({
   id: '/voice-and-tone',
@@ -48,6 +50,11 @@ const TargetRoute = TargetRouteImport.update({
 const StandardsRoute = StandardsRouteImport.update({
   id: '/standards',
   path: '/standards',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SalesForecastingRoute = SalesForecastingRouteImport.update({
+  id: '/sales-forecasting',
+  path: '/sales-forecasting',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PersonasRoute = PersonasRouteImport.update({
@@ -130,12 +137,18 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardSalesForecastingRoute =
+  DashboardSalesForecastingRouteImport.update({
+    id: '/sales-forecasting',
+    path: '/sales-forecasting',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/category-definitions': typeof CategoryDefinitionsRoute
   '/category-definitions-new': typeof CategoryDefinitionsNewRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
   '/dashboards-old': typeof DashboardsOldRoute
   '/elements': typeof ElementsRoute
   '/figma': typeof FigmaRoute
@@ -148,16 +161,18 @@ export interface FileRoutesByFullPath {
   '/market-reports': typeof MarketReportsRoute
   '/patterns': typeof PatternsRoute
   '/personas': typeof PersonasRoute
+  '/sales-forecasting': typeof SalesForecastingRoute
   '/standards': typeof StandardsRoute
   '/target': typeof TargetRoute
   '/typography': typeof TypographyRoute
   '/voice-and-tone': typeof VoiceAndToneRoute
+  '/dashboard/sales-forecasting': typeof DashboardSalesForecastingRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/category-definitions': typeof CategoryDefinitionsRoute
   '/category-definitions-new': typeof CategoryDefinitionsNewRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
   '/dashboards-old': typeof DashboardsOldRoute
   '/elements': typeof ElementsRoute
   '/figma': typeof FigmaRoute
@@ -170,17 +185,19 @@ export interface FileRoutesByTo {
   '/market-reports': typeof MarketReportsRoute
   '/patterns': typeof PatternsRoute
   '/personas': typeof PersonasRoute
+  '/sales-forecasting': typeof SalesForecastingRoute
   '/standards': typeof StandardsRoute
   '/target': typeof TargetRoute
   '/typography': typeof TypographyRoute
   '/voice-and-tone': typeof VoiceAndToneRoute
+  '/dashboard/sales-forecasting': typeof DashboardSalesForecastingRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/category-definitions': typeof CategoryDefinitionsRoute
   '/category-definitions-new': typeof CategoryDefinitionsNewRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
   '/dashboards-old': typeof DashboardsOldRoute
   '/elements': typeof ElementsRoute
   '/figma': typeof FigmaRoute
@@ -193,10 +210,12 @@ export interface FileRoutesById {
   '/market-reports': typeof MarketReportsRoute
   '/patterns': typeof PatternsRoute
   '/personas': typeof PersonasRoute
+  '/sales-forecasting': typeof SalesForecastingRoute
   '/standards': typeof StandardsRoute
   '/target': typeof TargetRoute
   '/typography': typeof TypographyRoute
   '/voice-and-tone': typeof VoiceAndToneRoute
+  '/dashboard/sales-forecasting': typeof DashboardSalesForecastingRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -217,10 +236,12 @@ export interface FileRouteTypes {
     | '/market-reports'
     | '/patterns'
     | '/personas'
+    | '/sales-forecasting'
     | '/standards'
     | '/target'
     | '/typography'
     | '/voice-and-tone'
+    | '/dashboard/sales-forecasting'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -239,10 +260,12 @@ export interface FileRouteTypes {
     | '/market-reports'
     | '/patterns'
     | '/personas'
+    | '/sales-forecasting'
     | '/standards'
     | '/target'
     | '/typography'
     | '/voice-and-tone'
+    | '/dashboard/sales-forecasting'
   id:
     | '__root__'
     | '/'
@@ -261,17 +284,19 @@ export interface FileRouteTypes {
     | '/market-reports'
     | '/patterns'
     | '/personas'
+    | '/sales-forecasting'
     | '/standards'
     | '/target'
     | '/typography'
     | '/voice-and-tone'
+    | '/dashboard/sales-forecasting'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CategoryDefinitionsRoute: typeof CategoryDefinitionsRoute
   CategoryDefinitionsNewRoute: typeof CategoryDefinitionsNewRoute
-  DashboardRoute: typeof DashboardRoute
+  DashboardRoute: typeof DashboardRouteWithChildren
   DashboardsOldRoute: typeof DashboardsOldRoute
   ElementsRoute: typeof ElementsRoute
   FigmaRoute: typeof FigmaRoute
@@ -284,6 +309,7 @@ export interface RootRouteChildren {
   MarketReportsRoute: typeof MarketReportsRoute
   PatternsRoute: typeof PatternsRoute
   PersonasRoute: typeof PersonasRoute
+  SalesForecastingRoute: typeof SalesForecastingRoute
   StandardsRoute: typeof StandardsRoute
   TargetRoute: typeof TargetRoute
   TypographyRoute: typeof TypographyRoute
@@ -318,6 +344,13 @@ declare module '@tanstack/react-router' {
       path: '/standards'
       fullPath: '/standards'
       preLoaderRoute: typeof StandardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sales-forecasting': {
+      id: '/sales-forecasting'
+      path: '/sales-forecasting'
+      fullPath: '/sales-forecasting'
+      preLoaderRoute: typeof SalesForecastingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/personas': {
@@ -432,14 +465,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard/sales-forecasting': {
+      id: '/dashboard/sales-forecasting'
+      path: '/sales-forecasting'
+      fullPath: '/dashboard/sales-forecasting'
+      preLoaderRoute: typeof DashboardSalesForecastingRouteImport
+      parentRoute: typeof DashboardRoute
+    }
   }
 }
+
+interface DashboardRouteChildren {
+  DashboardSalesForecastingRoute: typeof DashboardSalesForecastingRoute
+}
+
+const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardSalesForecastingRoute: DashboardSalesForecastingRoute,
+}
+
+const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
+  DashboardRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CategoryDefinitionsRoute: CategoryDefinitionsRoute,
   CategoryDefinitionsNewRoute: CategoryDefinitionsNewRoute,
-  DashboardRoute: DashboardRoute,
+  DashboardRoute: DashboardRouteWithChildren,
   DashboardsOldRoute: DashboardsOldRoute,
   ElementsRoute: ElementsRoute,
   FigmaRoute: FigmaRoute,
@@ -452,6 +504,7 @@ const rootRouteChildren: RootRouteChildren = {
   MarketReportsRoute: MarketReportsRoute,
   PatternsRoute: PatternsRoute,
   PersonasRoute: PersonasRoute,
+  SalesForecastingRoute: SalesForecastingRoute,
   StandardsRoute: StandardsRoute,
   TargetRoute: TargetRoute,
   TypographyRoute: TypographyRoute,

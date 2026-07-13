@@ -90,6 +90,11 @@ const navItems = [
         to: '/category-definitions-new',
       },
       { id: 'find-a-rep', label: 'Find My Sales Rep', to: '/find-a-rep' }, // ← NEW
+      {
+        id: 'sales-forecasting',
+        label: 'Sales Forecasting',
+        to: '/sales-forecasting',
+      }, // ← NEW
     ],
   },
 ]
