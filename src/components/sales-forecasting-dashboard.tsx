@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState, useRef, Fragment } from "react";
 import type { FeatureCollection } from "geojson";
+import * as XLSX from "xlsx";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
 import {
   TrendingUp, TrendingDown, Handshake, Gavel, ChevronDown, ChevronRight,
   CalendarClock, Target, X, ArrowLeft, CheckCircle2, FileText, Users, ArrowUp, ArrowDown, ArrowUpDown, RotateCcw,
-  Search, MapPin, ListFilter,
+  Search, MapPin, ListFilter, Download,
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -25,6 +26,7 @@ import {
   REGIONS, REPS, repById, auctionById, primeCountyAssignments, mulberry32, hashStr,
   getCountyRecord, getCountyListings, getAuctionWeeklyTrend, getAuctionListings,
   getMonthlyPipeline, getQuarterlyPipeline, getCurrentQuarterMonths, FIPS_TO_STATE,
+  getAuctionRegionShare, getAuctionDistrictShare, getListingItems, STATE_NAMES, getTimeframeDateRange,
   AUCTIONS, STAGE_LABEL, STAGE_COLOR,
   RegionId, PipelineStage, CountyRecord,
 } from "@/data/mockSalesForecastData";
@@ -54,9 +56,8 @@ const TIMEFRAMES = [
 ] as const;
 type TimeframeId = (typeof TIMEFRAMES)[number]["id"];
 
-const STAGE_ORDER: PipelineStage[] = ["prospect", "working", "signedReady", "closed"];
-// Rep breakdown panel uses its own order per request: Closed, Signed & Ready, WIP, Prospect.
-const REP_STAGE_ORDER: PipelineStage[] = ["closed", "signedReady", "working", "prospect"];
+// Both the county drill-down and rep breakdown panels use this order per request.
+const STAGE_ORDER: PipelineStage[] = ["closed", "signedReady", "working", "prospect"];
 
 const STAGE_BADGE_CLASS: Record<PipelineStage, string> = {
   closed: "bg-green-50 text-green-700 border-green-200",
@@ -262,6 +263,7 @@ export default function SalesForecastingDashboard() {
 
   // Reps & Territories table search (name / state / county)
   const [repSearchQuery, setRepSearchQuery] = useState("");
+  const [auctionScope, setAuctionScope] = useState("all"); // "all" | "region:<id>" | "district:<repId>"
   useEffect(() => {
     if (expandedRepId) {
       setDisplayRepId(expandedRepId);
@@ -360,6 +362,7 @@ export default function SalesForecastingDashboard() {
         const name = `${(feature.properties as any)?.NAME ?? "Unknown"} County`;
         const rec = getCountyRecord(fips, name);
         if (!visibleRegions.includes(rec.regionId)) continue;
+        if (visibleRepIds && (!rec.repId || !visibleRepIds.has(rec.repId))) continue;
 
         totals.prospect += rec.prospect.value;
         if (rec.repId) totals.prospectAssigned += rec.prospect.value;
@@ -395,7 +398,7 @@ export default function SalesForecastingDashboard() {
       }
     }
     return { totals, repRollups: rollups, countiesByRep: byRep, totalsByState: byState };
-  }, [geo, visibleRegions]);
+  }, [geo, visibleRegions, visibleRepIds]);
 
   // The Overview "research" filters narrow just the KPI cards/trend below —
   // most specific wins: a single county > a single rep's book > a whole
@@ -435,6 +438,52 @@ export default function SalesForecastingDashboard() {
     return totals;
   }, [countyFilterFips, countyFilterMeta, repFilterId, countiesByRep, stateFilter, totalsByState, totals]);
 
+  // The actual counties behind whatever's currently in scope (same
+  // precedence as overviewTotals) — used to generate real listings so the
+  // KPI cards and their drill-down tables are guaranteed to agree, instead
+  // of a card showing a smoothed proportional number while its drill-down
+  // showed a totally different unfiltered list.
+  const inScopeCounties = useMemo(() => {
+    if (countyFilterFips && countyFilterMeta) {
+      return [{ fips: countyFilterFips, name: countyFilterMeta.name, stateAbbr: countyFilterMeta.stateAbbr }];
+    }
+    if (repFilterId) {
+      return (countiesByRep.get(repFilterId) ?? []).map((c) => ({ fips: c.fips, name: c.name, stateAbbr: c.stateAbbr }));
+    }
+    if (!geo) return [];
+    const list: { fips: string; name: string; stateAbbr: string }[] = [];
+    for (const feature of geo.features) {
+      const fips = fipsFromFeature(feature as any);
+      const name = `${(feature.properties as any)?.NAME ?? "Unknown"} County`;
+      const rec = getCountyRecord(fips, name);
+      if (!visibleRegions.includes(rec.regionId)) continue;
+      if (stateFilter && rec.stateAbbr !== stateFilter) continue;
+      list.push({ fips, name, stateAbbr: rec.stateAbbr });
+    }
+    return list;
+  }, [geo, countyFilterFips, countyFilterMeta, repFilterId, countiesByRep, visibleRegions, stateFilter]);
+
+  const inScopeListings = useMemo(
+    () => inScopeCounties.flatMap((c) => getCountyListings(c.fips, c.name, c.stateAbbr)),
+    [inScopeCounties]
+  );
+
+  const timeframeAuctionRange = useMemo(() => getTimeframeDateRange(timeframe), [timeframe]);
+
+  /** Sums a stage's listings whose linked auction ends within `range` — the
+   * real, listing-level version of what the card shows (Prospects have no
+   * auction/date, so they're handled separately with proportional scaling). */
+  function sumListingsInRange(stage: PipelineStage, range: { start: number; end: number }) {
+    let sum = 0;
+    for (const l of inScopeListings) {
+      if (l.stage !== stage) continue;
+      const auction = l.auctionId ? auctionById(l.auctionId) : undefined;
+      if (!auction || auction.endDateTimestamp < range.start || auction.endDateTimestamp > range.end) continue;
+      sum += l.value;
+    }
+    return sum;
+  }
+
   const countyMatches = useMemo(() => {
     if (!geo || countyQuery.trim().length < 2) return [];
     const q = countyQuery.trim().toLowerCase();
@@ -450,6 +499,34 @@ export default function SalesForecastingDashboard() {
     }
     return matches;
   }, [geo, countyQuery]);
+
+  // Coverage Map search: matches both whole states (fly-to-bounds) and
+  // individual counties (select + fly-to-bounds, same as clicking the map).
+  const [mapSearchQuery, setMapSearchQuery] = useState("");
+  const [mapSearchOpen, setMapSearchOpen] = useState(false);
+  const mapSearchMatches = useMemo(() => {
+    const q = mapSearchQuery.trim().toLowerCase();
+    if (q.length < 2) return { states: [] as { abbr: string; name: string }[], counties: [] as { fips: string; name: string; stateAbbr: string }[] };
+
+    const states = Object.entries(STATE_NAMES)
+      .filter(([abbr, name]) => abbr.toLowerCase().includes(q) || name.toLowerCase().includes(q))
+      .slice(0, 8)
+      .map(([abbr, name]) => ({ abbr, name }));
+
+    const counties: { fips: string; name: string; stateAbbr: string }[] = [];
+    if (geo) {
+      for (const feature of geo.features) {
+        const fips = fipsFromFeature(feature as any);
+        const name = `${(feature.properties as any)?.NAME ?? "Unknown"} County`;
+        const stateAbbr = FIPS_TO_STATE[fips.slice(0, 2)] ?? "";
+        if (name.toLowerCase().includes(q) || stateAbbr.toLowerCase().includes(q)) {
+          counties.push({ fips, name, stateAbbr });
+          if (counties.length >= 15) break;
+        }
+      }
+    }
+    return { states, counties };
+  }, [geo, mapSearchQuery]);
 
   const allStates = useMemo(() => Array.from(new Set(Object.values(FIPS_TO_STATE))).sort(), []);
 
@@ -473,9 +550,9 @@ export default function SalesForecastingDashboard() {
   const scaled = {
     prospect: Math.round(overviewTotals.prospect * factor),
     prospectAssigned: Math.round(overviewTotals.prospectAssigned * factor),
-    working: Math.round(overviewTotals.working * factor),
-    signedReady: Math.round(overviewTotals.signedReady * factor),
-    closed: Math.round(overviewTotals.closed * factor),
+    working: sumListingsInRange("working", timeframeAuctionRange),
+    signedReady: sumListingsInRange("signedReady", timeframeAuctionRange),
+    closed: sumListingsInRange("closed", timeframeAuctionRange),
     priorYearClosed: Math.round(overviewTotals.priorYearClosed * factor),
     budget: Math.round(overviewTotals.budget * factor),
   };
@@ -503,7 +580,7 @@ export default function SalesForecastingDashboard() {
   const trendJitter = (key: string) => 0.82 + mulberry32(hashStr(key))() * 0.36;
   const trendData = TIMEFRAMES.map((tf) => ({
     name: tf.label.replace("This ", ""),
-    Actual: Math.round(overviewTotals.closed * tf.factor * trendJitter(`${tf.id}-actual`)),
+    Actual: sumListingsInRange("closed", getTimeframeDateRange(tf.id)),
     "Prior Year": Math.round(overviewTotals.priorYearClosed * tf.factor * trendJitter(`${tf.id}-prior`)),
   }));
 
@@ -578,6 +655,8 @@ export default function SalesForecastingDashboard() {
     stage: (l: (typeof selectedCountyListings)[number]) => l.stage,
     rep: (l: (typeof selectedCountyListings)[number]) => (l.repId ? repById(l.repId)?.name ?? "" : ""),
     auction: (l: (typeof selectedCountyListings)[number]) => (l.auctionId ? auctionById(l.auctionId)?.name ?? "" : ""),
+    auctionEndDate: (l: (typeof selectedCountyListings)[number]) => (l.auctionId ? auctionById(l.auctionId)?.endDate ?? "" : ""),
+    auctionType: (l: (typeof selectedCountyListings)[number]) => l.auctionType ?? "",
     value: (l: (typeof selectedCountyListings)[number]) => l.value,
   };
   const sortedCountyListings = sortRows(selectedCountyListings, countyListingsSort.sort, countyListingsAccessors);
@@ -596,6 +675,8 @@ export default function SalesForecastingDashboard() {
     description: (l: (typeof expandedRepListings)[number]) => l.description,
     stage: (l: (typeof expandedRepListings)[number]) => l.stage,
     auction: (l: (typeof expandedRepListings)[number]) => (l.auctionId ? auctionById(l.auctionId)?.name ?? "" : ""),
+    auctionEndDate: (l: (typeof expandedRepListings)[number]) => (l.auctionId ? auctionById(l.auctionId)?.endDate ?? "" : ""),
+    auctionType: (l: (typeof expandedRepListings)[number]) => l.auctionType ?? "",
     value: (l: (typeof expandedRepListings)[number]) => l.value,
   };
   const filteredExpandedRepListings = useMemo(
@@ -608,22 +689,28 @@ export default function SalesForecastingDashboard() {
   );
 
   const stageListings = useMemo(() => {
-    if (!displayStage || !geo) return [];
-    const rows: { fips: string; countyName: string; stateAbbr: string; repId: string | null; description: string; value: number; auctionId: string | null }[] = [];
-    for (const feature of geo.features) {
-      const fips = fipsFromFeature(feature as any);
-      const name = `${(feature.properties as any)?.NAME ?? "Unknown"} County`;
-      const rec = getCountyRecord(fips, name);
-      if (!visibleRegions.includes(rec.regionId)) continue;
-      if (rec[displayStage].count === 0) continue;
-      const stateAbbr = rec.stateAbbr;
-      const listings = getCountyListings(fips, name, stateAbbr).filter((l) => l.stage === displayStage);
-      for (const l of listings) {
-        rows.push({ fips, countyName: name, stateAbbr, repId: l.repId, description: l.description, value: l.value, auctionId: l.auctionId });
-      }
+    if (!displayStage) return [];
+    const matching = inScopeListings.filter((l) => l.stage === displayStage);
+
+    if (displayStage === "prospect") {
+      // No auction/date to filter by for prospects — approximate the same
+      // proportional scaling the card uses, via a deterministic sample
+      // (stable shuffle) rather than just taking the first N by value, so
+      // it's not always the same handful of biggest prospects on every timeframe.
+      const shuffled = [...matching].sort(
+        (a, b) => mulberry32(hashStr(a.fips + a.description + a.value))() - mulberry32(hashStr(b.fips + b.description + b.value))()
+      );
+      const targetCount = matching.length === 0 ? 0 : Math.max(1, Math.round(matching.length * factor));
+      return shuffled.slice(0, targetCount).sort((a, b) => b.value - a.value);
     }
-    return rows.sort((a, b) => b.value - a.value);
-  }, [displayStage, geo, visibleRegions]);
+
+    return matching
+      .filter((l) => {
+        const auction = l.auctionId ? auctionById(l.auctionId) : undefined;
+        return auction && auction.endDateTimestamp >= timeframeAuctionRange.start && auction.endDateTimestamp <= timeframeAuctionRange.end;
+      })
+      .sort((a, b) => b.value - a.value);
+  }, [displayStage, inScopeListings, timeframeAuctionRange, factor]);
 
   const stageListingsSort = useSort("value", "desc");
   const stageListingsAccessors = {
@@ -631,6 +718,8 @@ export default function SalesForecastingDashboard() {
     description: (l: (typeof stageListings)[number]) => l.description,
     rep: (l: (typeof stageListings)[number]) => (l.repId ? repById(l.repId)?.name ?? "" : ""),
     auction: (l: (typeof stageListings)[number]) => (l.auctionId ? auctionById(l.auctionId)?.name ?? "" : ""),
+    auctionEndDate: (l: (typeof stageListings)[number]) => (l.auctionId ? auctionById(l.auctionId)?.endDate ?? "" : ""),
+    auctionType: (l: (typeof stageListings)[number]) => l.auctionType ?? "",
     value: (l: (typeof stageListings)[number]) => l.value,
   };
   const sortedStageListings = useMemo(
@@ -638,9 +727,58 @@ export default function SalesForecastingDashboard() {
     [stageListings, stageListingsSort.sort]
   );
 
-  const scheduledAuctions = AUCTIONS.filter((a) => a.scheduled);
-  const tbaAuction = AUCTIONS.find((a) => !a.scheduled) ?? null;
-  const selectedAuction = selectedAuctionId ? AUCTIONS.find((a) => a.id === selectedAuctionId) : null;
+  const auctionScopeShare = (auctionId: string): number => {
+    if (auctionScope === "all") return 1;
+    if (auctionScope.startsWith("region:")) return getAuctionRegionShare(auctionId, auctionScope.slice(7) as RegionId);
+    if (auctionScope.startsWith("district:")) return getAuctionDistrictShare(auctionId, auctionScope.slice(9));
+    return 1;
+  };
+
+  // Auctions aren't inherently regional/district-scoped (they're a national
+  // list) — scoping multiplies each auction's figures by its deterministic
+  // attribution share for the selected region/district. See
+  // getAuctionRegionShare/getAuctionDistrictShare for how that's derived.
+  const scopedAuctions = useMemo(
+    () =>
+      AUCTIONS.map((a) => {
+        const share = auctionScopeShare(a.id);
+        return {
+          ...a,
+          submittedCount: Math.round(a.submittedCount * share),
+          workingCount: Math.round(a.workingCount * share),
+          acceptedCount: Math.round(a.acceptedCount * share),
+          submittedValue: Math.round(a.submittedValue * share),
+          workingValue: Math.round(a.workingValue * share),
+          acceptedValue: Math.round(a.acceptedValue * share),
+        };
+      }),
+    [auctionScope]
+  );
+
+  // This Week/Month/Quarter/Year (the same top-level selector driving the
+  // rest of the Overview tab) also scopes which auctions show up here, by
+  // real calendar date — Auction TBA has no confirmed date, so it's always
+  // included regardless of which window is selected.
+  const timeframeFilteredAuctions = useMemo(
+    () =>
+      scopedAuctions.filter(
+        (a) => !a.scheduled || (a.endDateTimestamp >= timeframeAuctionRange.start && a.endDateTimestamp <= timeframeAuctionRange.end)
+      ),
+    [scopedAuctions, timeframeAuctionRange]
+  );
+
+  const districtOptions = useMemo(
+    () =>
+      REPS.filter((r) => r.type === "district").map((d) => ({
+        value: `district:${d.id}`,
+        label: `${d.name} (${REGIONS.find((r) => r.id === d.regionId)?.name})`,
+      })),
+    []
+  );
+
+  const scheduledAuctions = timeframeFilteredAuctions.filter((a) => a.scheduled);
+  const tbaAuction = timeframeFilteredAuctions.find((a) => !a.scheduled) ?? null;
+  const selectedAuction = selectedAuctionId ? scopedAuctions.find((a) => a.id === selectedAuctionId) : null;
 
   // Actual = already-accepted business across confirmed auctions.
   // Projected = that same confirmed set's full submitted pipeline (accepted + still working).
@@ -653,13 +791,58 @@ export default function SalesForecastingDashboard() {
 
   const auctionsSort = useSort("", "asc");
   const auctionsAccessors = {
-    name: (a: (typeof AUCTIONS)[number]) => a.name,
-    week: (a: (typeof AUCTIONS)[number]) => a.week,
-    submitted: (a: (typeof AUCTIONS)[number]) => a.submittedValue,
-    working: (a: (typeof AUCTIONS)[number]) => a.workingValue,
-    accepted: (a: (typeof AUCTIONS)[number]) => a.acceptedValue,
+    name: (a: (typeof scopedAuctions)[number]) => a.name,
+    auctionType: (a: (typeof scopedAuctions)[number]) => a.auctionType,
+    week: (a: (typeof scopedAuctions)[number]) => a.week,
+    submitted: (a: (typeof scopedAuctions)[number]) => a.submittedValue,
+    working: (a: (typeof scopedAuctions)[number]) => a.workingValue,
+    accepted: (a: (typeof scopedAuctions)[number]) => a.acceptedValue,
   };
-  const sortedAuctions = useMemo(() => sortRows(AUCTIONS, auctionsSort.sort, auctionsAccessors), [auctionsSort.sort]);
+  const sortedAuctions = useMemo(() => sortRows(timeframeFilteredAuctions, auctionsSort.sort, auctionsAccessors), [timeframeFilteredAuctions, auctionsSort.sort]);
+
+  const exportToExcel = () => {
+    const repsSheet = sortedRepTableRows.map(({ rep, manager, roll, total }) => ({
+      Rep: rep.name,
+      Type: rep.type === "territory" ? "Territory Manager" : "Independent Sales Rep",
+      "District Manager": manager?.name ?? "",
+      Counties: roll.counties,
+      Prospect: Math.round(roll.prospect * factor),
+      "Work In Progress": Math.round(roll.working * factor),
+      "Signed & Ready": Math.round(roll.signedReady * factor),
+      Closed: Math.round(roll.closed * factor),
+      Total: Math.round(total * factor),
+    }));
+
+    const auctionsSheet = AUCTIONS.map((a) => ({
+      Auction: a.name,
+      Status: a.scheduled ? "Scheduled" : "TBA",
+      Week: a.week,
+      "End Date": a.endDate,
+      Type: a.auctionType,
+      "Submitted Count": a.submittedCount,
+      "Submitted Value": a.submittedValue,
+      "Working Count": a.workingCount,
+      "Working Value": a.workingValue,
+      "Accepted Count": a.acceptedCount,
+      "Accepted Value": a.acceptedValue,
+    }));
+
+    const summarySheet = [
+      { Metric: "Timeframe", Value: TIMEFRAMES.find((t) => t.id === timeframe)!.label },
+      { Metric: "Actual Sales (Closed)", Value: scaled.closed },
+      { Metric: "Signed & Ready", Value: scaled.signedReady },
+      { Metric: "Work In Progress", Value: scaled.working },
+      { Metric: "Prospects", Value: scaled.prospect },
+      { Metric: "Total Potential", Value: totalPotential },
+      { Metric: "Prior Year (Closed)", Value: scaled.priorYearClosed },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summarySheet), "Overview Summary");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(repsSheet), "Reps & Territories");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(auctionsSheet), "Auctions");
+    XLSX.writeFile(wb, "sales-forecast-export.xlsx");
+  };
 
   return (
     <div className="space-y-6">
@@ -710,6 +893,18 @@ export default function SalesForecastingDashboard() {
               ))}
             </SelectContent>
           </Select>
+
+          <div className="mx-1 h-5 w-px bg-border" />
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={exportToExcel}
+            className="h-9 w-9 bg-white shadow-sm"
+            title="Export to Excel"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -797,7 +992,7 @@ export default function SalesForecastingDashboard() {
                             <span className="truncate">{countyFilterMeta ? `${countyFilterMeta.name}, ${countyFilterMeta.stateAbbr}` : "Search a county…"}</span>
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-72 p-0" align="start">
+                        <PopoverContent className="w-72 p-0 !z-[2000]" align="start">
                           <Command shouldFilter={false}>
                             <CommandInput placeholder="Type a county or state…" value={countyQuery} onValueChange={setCountyQuery} />
                             <CommandList>
@@ -831,7 +1026,7 @@ export default function SalesForecastingDashboard() {
                             <span className="truncate">{repFilterId ? repById(repFilterId)?.name : "Search a salesperson…"}</span>
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-64 p-0" align="start">
+                        <PopoverContent className="w-64 p-0 !z-[2000]" align="start">
                           <Command shouldFilter={false}>
                             <CommandInput placeholder="Type a name…" value={repFilterQuery} onValueChange={setRepFilterQuery} />
                             <CommandList>
@@ -955,7 +1150,8 @@ export default function SalesForecastingDashboard() {
                     <div>
                       <CardTitle className="text-sm font-semibold">{STAGE_LABEL[displayStage]} Listings</CardTitle>
                       <CardDescription>
-                        {stageListings.length} listings across {visibleRegions.length === REGIONS.length ? "all regions" : "the selected scope"}
+                        {stageListings.length} listings · {TIMEFRAMES.find((t) => t.id === timeframe)!.label.toLowerCase()}
+                        {displayStage !== "prospect" ? " (by auction date)" : " (approximate, no fixed date yet)"}
                       </CardDescription>
                     </div>
                     <button onClick={() => setSelectedStage(null)} className="rounded-md p-1 text-muted-foreground hover:bg-muted">
@@ -968,42 +1164,59 @@ export default function SalesForecastingDashboard() {
                         <TableHeader className="sticky top-0 z-10 bg-background">
                           <TableRow>
                             <SortableHead label="County" sortKey="county" sort={stageListingsSort.sort} onSort={stageListingsSort.onSort} />
-                            <SortableHead label="Listing" sortKey="description" sort={stageListingsSort.sort} onSort={stageListingsSort.onSort} />
+                            {displayStage !== "prospect" && (
+                              <SortableHead label="Listing" sortKey="description" sort={stageListingsSort.sort} onSort={stageListingsSort.onSort} />
+                            )}
                             <SortableHead label="Rep" sortKey="rep" sort={stageListingsSort.sort} onSort={stageListingsSort.onSort} />
-                            {displayStage === "closed" && (
-                              <SortableHead label="Auction" sortKey="auction" sort={stageListingsSort.sort} onSort={stageListingsSort.onSort} />
+                            {displayStage !== "prospect" ? (
+                              <>
+                                <SortableHead label="Auction" sortKey="auction" sort={stageListingsSort.sort} onSort={stageListingsSort.onSort} />
+                                <SortableHead label="Auction End Date" sortKey="auctionEndDate" sort={stageListingsSort.sort} onSort={stageListingsSort.onSort} />
+                                <SortableHead label="Auction Type" sortKey="auctionType" sort={stageListingsSort.sort} onSort={stageListingsSort.onSort} />
+                              </>
+                            ) : (
+                              <SortableHead label="Auction Type" sortKey="auctionType" sort={stageListingsSort.sort} onSort={stageListingsSort.onSort} />
                             )}
                             <SortableHead label="Value" sortKey="value" sort={stageListingsSort.sort} onSort={stageListingsSort.onSort} align="right" />
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {sortedStageListings.map((l, i) => (
-                            <TableRow key={`${l.fips}-${i}`}>
-                              <TableCell className="text-muted-foreground">
-                                {l.countyName}, {l.stateAbbr}
-                              </TableCell>
-                              <TableCell>{l.description}</TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {l.repId ? (
-                                  <button
-                                    onClick={() => goToRepBreakdown(l.repId!)}
-                                    className="text-foreground underline-offset-2 hover:underline"
-                                  >
-                                    {repById(l.repId)?.name}
-                                  </button>
+                          {sortedStageListings.map((l, i) => {
+                            const auction = l.auctionId ? auctionById(l.auctionId) : undefined;
+                            return (
+                              <TableRow key={`${l.fips}-${i}`}>
+                                <TableCell className="text-muted-foreground">
+                                  {l.countyName}, {l.stateAbbr}
+                                </TableCell>
+                                {displayStage !== "prospect" && <TableCell>{l.description}</TableCell>}
+                                <TableCell className="text-muted-foreground">
+                                  {l.repId ? (
+                                    <button
+                                      onClick={() => goToRepBreakdown(l.repId!)}
+                                      className="text-foreground underline-offset-2 hover:underline"
+                                    >
+                                      {repById(l.repId)?.name}
+                                    </button>
+                                  ) : (
+                                    "Unassigned"
+                                  )}
+                                </TableCell>
+                                {displayStage !== "prospect" ? (
+                                  <>
+                                    <TableCell className="text-muted-foreground">{auction?.name ?? "—"}</TableCell>
+                                    <TableCell className="text-muted-foreground">{auction?.endDate ?? "—"}</TableCell>
+                                    <TableCell className="text-muted-foreground">{l.auctionType ?? "—"}</TableCell>
+                                  </>
                                 ) : (
-                                  "Unassigned"
+                                  <TableCell className="text-muted-foreground">{l.auctionType ?? "—"}</TableCell>
                                 )}
-                              </TableCell>
-                              {displayStage === "closed" && (
-                                <TableCell className="text-muted-foreground">{l.auctionId ? auctionById(l.auctionId)?.name : "—"}</TableCell>
-                              )}
-                              <TableCell className="text-right font-medium">{fmtMoney(l.value)}</TableCell>
-                            </TableRow>
-                          ))}
+                                <TableCell className="text-right font-medium">{fmtMoney(l.value)}</TableCell>
+                              </TableRow>
+                            );
+                          })}
                           {stageListings.length === 0 && (
                             <TableRow>
-                              <TableCell colSpan={displayStage === "closed" ? 5 : 4} className="py-8 text-center text-muted-foreground">
+                              <TableCell colSpan={displayStage !== "prospect" ? 7 : 4} className="py-8 text-center text-muted-foreground">
                                 {geo ? "No listings at this stage in the current scope." : "Waiting on county data to load…"}
                               </TableCell>
                             </TableRow>
@@ -1172,28 +1385,76 @@ export default function SalesForecastingDashboard() {
         <TabsContent value="territories" className="space-y-4">
           <div ref={mapCardRef}>
             <Card className="!py-2">
-              <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 !py-2">
-                <div>
-                  <CardTitle className="text-sm font-semibold">Coverage Map</CardTitle>
-                  <CardDescription>Click a county for its full pipeline breakdown</CardDescription>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="hidden gap-3 sm:flex">
-                    {(Object.keys(STATUS_COLOR) as (keyof typeof STATUS_COLOR)[]).map((k) => (
-                      <div key={k} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <span className="h-2.5 w-2.5 rounded-sm" style={{ background: STATUS_COLOR[k] }} />
-                        {STATUS_LABEL[k]}
-                      </div>
-                    ))}
+              <CardHeader className="!py-2 space-y-2">
+                <div className="flex flex-row items-start justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-sm font-semibold">Coverage Map</CardTitle>
+                    <CardDescription>Click a county for its full pipeline breakdown</CardDescription>
                   </div>
-                  <button
-                    onClick={() => territoryMapRef.current?.resetView()}
-                    className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    Reset view
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <div className="hidden gap-3 sm:flex">
+                      {(Object.keys(STATUS_COLOR) as (keyof typeof STATUS_COLOR)[]).map((k) => (
+                        <div key={k} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: STATUS_COLOR[k] }} />
+                          {STATUS_LABEL[k]}
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => territoryMapRef.current?.resetView()}
+                      className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Reset view
+                    </button>
+                  </div>
                 </div>
+                <Popover open={mapSearchOpen} onOpenChange={setMapSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="h-8 w-72 justify-start bg-white text-xs font-normal">
+                      <Search className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                      Search a state or county…
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-0 !z-[2000]" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput placeholder="Type a state or county…" value={mapSearchQuery} onValueChange={setMapSearchQuery} />
+                      <CommandList>
+                        <CommandEmpty>{mapSearchQuery.trim().length < 2 ? "Type at least 2 characters…" : "No matches found."}</CommandEmpty>
+                        {mapSearchMatches.states.length > 0 && (
+                          <div className="px-2 pb-1 pt-2 text-[11px] font-medium text-muted-foreground">States</div>
+                        )}
+                        {mapSearchMatches.states.map((s) => (
+                          <CommandItem
+                            key={s.abbr}
+                            onSelect={() => {
+                              territoryMapRef.current?.flyToState(s.abbr);
+                              setMapSearchOpen(false);
+                            }}
+                          >
+                            <MapPin className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                            {s.name} ({s.abbr})
+                          </CommandItem>
+                        ))}
+                        {mapSearchMatches.counties.length > 0 && (
+                          <div className="px-2 pb-1 pt-2 text-[11px] font-medium text-muted-foreground">Counties</div>
+                        )}
+                        {mapSearchMatches.counties.map((c) => (
+                          <CommandItem
+                            key={c.fips}
+                            onSelect={() => {
+                              setSelectedFips(c.fips);
+                              setSelectedCountyMeta({ name: c.name, stateAbbr: c.stateAbbr });
+                              setMapSearchOpen(false);
+                            }}
+                          >
+                            {c.name}, {c.stateAbbr}
+                          </CommandItem>
+                        ))}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </CardHeader>
               <CardContent className="!py-2">
                 <div className="h-[520px]">
@@ -1262,26 +1523,33 @@ export default function SalesForecastingDashboard() {
                             <SortableHead label="Stage" sortKey="stage" sort={countyListingsSort.sort} onSort={countyListingsSort.onSort} />
                             <SortableHead label="Rep" sortKey="rep" sort={countyListingsSort.sort} onSort={countyListingsSort.onSort} />
                             <SortableHead label="Auction" sortKey="auction" sort={countyListingsSort.sort} onSort={countyListingsSort.onSort} />
+                            <SortableHead label="Auction End Date" sortKey="auctionEndDate" sort={countyListingsSort.sort} onSort={countyListingsSort.onSort} />
+                            <SortableHead label="Auction Type" sortKey="auctionType" sort={countyListingsSort.sort} onSort={countyListingsSort.onSort} />
                             <SortableHead label="Value" sortKey="value" sort={countyListingsSort.sort} onSort={countyListingsSort.onSort} align="right" />
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {sortedCountyListings.map((l) => (
-                            <TableRow key={l.id}>
-                              <TableCell className="text-foreground">{l.description}</TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className={STAGE_BADGE_CLASS[l.stage]}>
-                                  {STAGE_LABEL[l.stage]}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-muted-foreground">{l.repId ? repById(l.repId)?.name : "Unassigned"}</TableCell>
-                              <TableCell className="text-muted-foreground">{l.auctionId ? auctionById(l.auctionId)?.name : "—"}</TableCell>
-                              <TableCell className="text-right font-medium">{fmtMoney(l.value)}</TableCell>
-                            </TableRow>
-                          ))}
+                          {sortedCountyListings.map((l) => {
+                            const auction = l.auctionId ? auctionById(l.auctionId) : undefined;
+                            return (
+                              <TableRow key={l.id}>
+                                <TableCell className="text-foreground">{l.description}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className={STAGE_BADGE_CLASS[l.stage]}>
+                                    {STAGE_LABEL[l.stage]}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">{l.repId ? repById(l.repId)?.name : "Unassigned"}</TableCell>
+                                <TableCell className="text-muted-foreground">{auction?.name ?? "—"}</TableCell>
+                                <TableCell className="text-muted-foreground">{auction?.endDate ?? "—"}</TableCell>
+                                <TableCell className="text-muted-foreground">{l.auctionType ?? "—"}</TableCell>
+                                <TableCell className="text-right font-medium">{fmtMoney(l.value)}</TableCell>
+                              </TableRow>
+                            );
+                          })}
                           {sortedCountyListings.length === 0 && (
                             <TableRow>
-                              <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">
+                              <TableCell colSpan={7} className="py-6 text-center text-muted-foreground">
                                 No listings recorded for this county yet.
                               </TableCell>
                             </TableRow>
@@ -1382,7 +1650,7 @@ export default function SalesForecastingDashboard() {
                                       {TIMEFRAMES.find((t) => t.id === timeframe)!.label.toLowerCase()}
                                     </p>
                                     <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                      {REP_STAGE_ORDER.map((stage) => {
+                                      {STAGE_ORDER.map((stage) => {
                                         const isActive = repStageFilter === stage;
                                         return (
                                           <button
@@ -1420,32 +1688,39 @@ export default function SalesForecastingDashboard() {
                                             <SortableHead label="Listing" sortKey="description" sort={repBreakdownSort.sort} onSort={repBreakdownSort.onSort} />
                                             <SortableHead label="Stage" sortKey="stage" sort={repBreakdownSort.sort} onSort={repBreakdownSort.onSort} />
                                             <SortableHead label="Auction" sortKey="auction" sort={repBreakdownSort.sort} onSort={repBreakdownSort.onSort} />
+                                            <SortableHead label="Auction End Date" sortKey="auctionEndDate" sort={repBreakdownSort.sort} onSort={repBreakdownSort.onSort} />
+                                            <SortableHead label="Auction Type" sortKey="auctionType" sort={repBreakdownSort.sort} onSort={repBreakdownSort.onSort} />
                                             <SortableHead label="Value" sortKey="value" sort={repBreakdownSort.sort} onSort={repBreakdownSort.onSort} align="right" />
                                           </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                          {sortedExpandedRepListings.map((l) => (
-                                            <TableRow
-                                              key={l.id}
-                                              className="cursor-pointer"
-                                              onClick={() => focusCounty(l.fips, l.countyName, l.stateAbbr, true)}
-                                            >
-                                              <TableCell className="text-muted-foreground">
-                                                {l.countyName}, {l.stateAbbr}
-                                              </TableCell>
-                                              <TableCell>{l.description}</TableCell>
-                                              <TableCell>
-                                                <Badge variant="outline" className={STAGE_BADGE_CLASS[l.stage]}>
-                                                  {STAGE_LABEL[l.stage]}
-                                                </Badge>
-                                              </TableCell>
-                                              <TableCell className="text-muted-foreground">{l.auctionId ? auctionById(l.auctionId)?.name : "—"}</TableCell>
-                                              <TableCell className="text-right font-medium">{fmtMoney(l.value)}</TableCell>
-                                            </TableRow>
-                                          ))}
+                                          {sortedExpandedRepListings.map((l) => {
+                                            const auction = l.auctionId ? auctionById(l.auctionId) : undefined;
+                                            return (
+                                              <TableRow
+                                                key={l.id}
+                                                className="cursor-pointer"
+                                                onClick={() => focusCounty(l.fips, l.countyName, l.stateAbbr, true)}
+                                              >
+                                                <TableCell className="text-muted-foreground">
+                                                  {l.countyName}, {l.stateAbbr}
+                                                </TableCell>
+                                                <TableCell>{l.description}</TableCell>
+                                                <TableCell>
+                                                  <Badge variant="outline" className={STAGE_BADGE_CLASS[l.stage]}>
+                                                    {STAGE_LABEL[l.stage]}
+                                                  </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-muted-foreground">{auction?.name ?? "—"}</TableCell>
+                                                <TableCell className="text-muted-foreground">{auction?.endDate ?? "—"}</TableCell>
+                                                <TableCell className="text-muted-foreground">{l.auctionType ?? "—"}</TableCell>
+                                                <TableCell className="text-right font-medium">{fmtMoney(l.value)}</TableCell>
+                                              </TableRow>
+                                            );
+                                          })}
                                           {sortedExpandedRepListings.length === 0 && (
                                             <TableRow>
-                                              <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">
+                                              <TableCell colSpan={7} className="py-6 text-center text-muted-foreground">
                                                 {repStageFilter
                                                   ? `No ${STAGE_LABEL[repStageFilter]} listings for this rep.`
                                                   : "No listings recorded for this rep's counties yet."}
@@ -1483,6 +1758,31 @@ export default function SalesForecastingDashboard() {
         <TabsContent value="auctions" className="space-y-4">
           {!selectedAuction ? (
             <>
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-semibold">Scope</h2>
+                  <p className="text-xs text-muted-foreground">Values below reflect this region/district's attributed share of each auction</p>
+                </div>
+                <Select value={auctionScope} onValueChange={setAuctionScope}>
+                  <SelectTrigger className="h-8 w-64 bg-white text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All (national)</SelectItem>
+                    {REGIONS.map((r) => (
+                      <SelectItem key={r.id} value={`region:${r.id}`}>
+                        {r.name}
+                      </SelectItem>
+                    ))}
+                    {districtOptions.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <StatCard label="Actual" value={fmtMoney(auctionTotals.actual)} icon={<CheckCircle2 className="h-4 w-4" />} footer={<span className="text-muted-foreground">Already-accepted, confirmed auctions</span>} />
                 <StatCard label="Projected" value={fmtMoney(auctionTotals.projected)} icon={<Target className="h-4 w-4" />} footer={<span className="text-muted-foreground">Accepted + working, confirmed auctions</span>} />
@@ -1491,14 +1791,17 @@ export default function SalesForecastingDashboard() {
 
               <Card className="!py-2">
                 <CardHeader className="!py-2">
-                  <CardTitle className="text-sm font-semibold">Weekly Auction Forecast</CardTitle>
-                  <CardDescription>Click an auction for its week-by-week detail</CardDescription>
+                  <CardTitle className="text-sm font-semibold">Auction Forecast</CardTitle>
+                  <CardDescription>
+                    {TIMEFRAMES.find((t) => t.id === timeframe)!.label} · {sortedAuctions.length} auctions · click one for its week-by-week detail
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="!p-0">
                   <Table>
                     <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
                         <SortableHead label="Auction" sortKey="name" sort={auctionsSort.sort} onSort={auctionsSort.onSort} />
+                        <SortableHead label="Type" sortKey="auctionType" sort={auctionsSort.sort} onSort={auctionsSort.onSort} />
                         <SortableHead label="Week" sortKey="week" sort={auctionsSort.sort} onSort={auctionsSort.onSort} />
                         <SortableHead label="Submitted" sortKey="submitted" sort={auctionsSort.sort} onSort={auctionsSort.onSort} align="right" />
                         <SortableHead label="Working" sortKey="working" sort={auctionsSort.sort} onSort={auctionsSort.onSort} align="right" />
@@ -1518,6 +1821,7 @@ export default function SalesForecastingDashboard() {
                               {!a.scheduled && <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">TBA</Badge>}
                             </span>
                           </TableCell>
+                          <TableCell className="text-muted-foreground">{a.auctionType}</TableCell>
                           <TableCell className="text-muted-foreground">
                             <span className="inline-flex items-center gap-1">
                               <CalendarClock className="h-3.5 w-3.5" />
@@ -1555,6 +1859,7 @@ function AuctionDetail({ auctionId, onBack }: { auctionId: string; onBack: () =>
   const auction = AUCTIONS.find((a) => a.id === auctionId)!;
   const trend = getAuctionWeeklyTrend(auctionId);
   const listings = getAuctionListings(auctionId);
+  const [expandedListingId, setExpandedListingId] = useState<string | null>(null);
 
   const listingsSort = useSort("value", "desc");
   const listingsAccessors = {
@@ -1629,18 +1934,75 @@ function AuctionDetail({ auctionId, onBack }: { auctionId: string; onBack: () =>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedListings.map((l) => (
-                  <TableRow key={l.id}>
-                    <TableCell>{l.description}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={STAGE_BADGE_CLASS[l.stage]}>
-                        {STAGE_LABEL[l.stage]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{l.repId ? repById(l.repId)?.name : "Unassigned"}</TableCell>
-                    <TableCell className="text-right font-medium">{fmtMoney(l.value)}</TableCell>
-                  </TableRow>
-                ))}
+                {sortedListings.map((l) => {
+                  const isOpen = expandedListingId === l.id;
+                  const items = getListingItems(l.id, l.value);
+                  return (
+                    <Fragment key={l.id}>
+                      <TableRow className="cursor-pointer" onClick={() => setExpandedListingId(isOpen ? null : l.id)}>
+                        <TableCell>
+                          <span className="inline-flex items-center gap-1.5">
+                            {isOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                            {l.description}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={STAGE_BADGE_CLASS[l.stage]}>
+                            {STAGE_LABEL[l.stage]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{l.repId ? repById(l.repId)?.name : "Unassigned"}</TableCell>
+                        <TableCell className="text-right font-medium">{fmtMoney(l.value)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell colSpan={4} className="p-0">
+                          <div className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                            <div className="min-h-0 overflow-hidden">
+                              <div className="border-t bg-muted/30 p-3">
+                                <p className="mb-2 text-xs font-medium text-muted-foreground">{items.length} items in this listing</p>
+                                <div className="overflow-hidden rounded-md border bg-background">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Lot Description</TableHead>
+                                        <TableHead className="text-right">Estimated GMV</TableHead>
+                                        <TableHead>Estimate Confidence</TableHead>
+                                        <TableHead className="text-right">Target Price</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {items.map((item) => (
+                                        <TableRow key={item.id}>
+                                          <TableCell>{item.lotDescription}</TableCell>
+                                          <TableCell className="text-right">{fmtMoney(item.estimatedGMV)}</TableCell>
+                                          <TableCell>
+                                            <Badge
+                                              variant="outline"
+                                              className={
+                                                item.estimateConfidence === "High"
+                                                  ? "bg-green-50 text-green-700 border-green-200"
+                                                  : item.estimateConfidence === "Medium"
+                                                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                                                  : "bg-orange-50 text-orange-700 border-orange-200"
+                                              }
+                                            >
+                                              {item.estimateConfidence}
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell className="text-right">{fmtMoney(item.targetPrice)}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    </Fragment>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

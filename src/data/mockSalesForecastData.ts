@@ -22,7 +22,7 @@ export interface Rep {
   parentId: string | null;
 }
 
-export type RegionId = "west" | "central" | "east";
+export type RegionId = "west" | "east";
 
 export interface StageAmount {
   count: number;
@@ -54,13 +54,22 @@ export interface Listing {
   description: string;
   value: number;
   auctionId: string | null;
+  /** Known even for prospects (a likely category), unlike auctionId/end date which aren't decided yet for them. */
+  auctionType: AuctionType | null;
 }
+
+export type AuctionType = "Single Seller" | "Equipment" | "At Risk";
 
 export interface Auction {
   id: string;
   name: string;
   scheduled: boolean;
   week: string;
+  /** Formatted end date (or expected end date, for the TBA auction). */
+  endDate: string;
+  /** Raw timestamp backing `endDate` — lets the UI filter by real date ranges (week/month/quarter/year) instead of parsing the formatted string. */
+  endDateTimestamp: number;
+  auctionType: AuctionType;
   submittedCount: number;
   workingCount: number;
   acceptedCount: number;
@@ -111,18 +120,31 @@ export const FIPS_TO_STATE: Record<string, string> = {
   "54": "WV", "55": "WI", "56": "WY",
 };
 
-const WEST = new Set(["WA","OR","CA","NV","ID","MT","WY","UT","CO","AZ","NM","AK","HI"]);
-const CENTRAL = new Set(["ND","SD","NE","KS","OK","TX","MN","IA","MO","AR","LA","WI","IL","MS","MI","IN"]);
+export const STATE_NAMES: Record<string, string> = {
+  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
+  CO: "Colorado", CT: "Connecticut", DE: "Delaware", DC: "District of Columbia",
+  FL: "Florida", GA: "Georgia", HI: "Hawaii", ID: "Idaho", IL: "Illinois",
+  IN: "Indiana", IA: "Iowa", KS: "Kansas", KY: "Kentucky", LA: "Louisiana",
+  ME: "Maine", MD: "Maryland", MA: "Massachusetts", MI: "Michigan", MN: "Minnesota",
+  MS: "Mississippi", MO: "Missouri", MT: "Montana", NE: "Nebraska", NV: "Nevada",
+  NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico", NY: "New York",
+  NC: "North Carolina", ND: "North Dakota", OH: "Ohio", OK: "Oklahoma", OR: "Oregon",
+  PA: "Pennsylvania", RI: "Rhode Island", SC: "South Carolina", SD: "South Dakota",
+  TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont", VA: "Virginia",
+  WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
+};
+
+const WEST = new Set([
+  "WA","OR","CA","NV","ID","MT","WY","UT","CO","AZ","NM","AK","HI",
+  "ND","SD","NE","KS","OK","TX","MN","IA","MO","AR","LA",
+]);
 
 export function regionForState(abbr: string): RegionId {
-  if (WEST.has(abbr)) return "west";
-  if (CENTRAL.has(abbr)) return "central";
-  return "east";
+  return WEST.has(abbr) ? "west" : "east";
 }
 
 export const REGIONS: { id: RegionId; name: string }[] = [
   { id: "west", name: "West Region" },
-  { id: "central", name: "Central Region" },
   { id: "east", name: "East Region" },
 ];
 
@@ -142,13 +164,11 @@ function buildReps(): Rep[] {
   const reps: Rep[] = [];
 
   // Field-rep headcount is proportional to each region's real county count
-  // (West ~14%, Central ~47%, East ~39% of all US counties) so coverage
-  // density ends up roughly even across regions instead of concentrated in
-  // the smallest one. ~148 people total.
+  // (West ~48%, East ~52% of all US counties with this split) so coverage
+  // density ends up roughly even across both. ~145 people total.
   const REGION_CONFIG: Record<RegionId, { districts: number; fieldRepsPerDistrict: number }> = {
-    west: { districts: 2, fieldRepsPerDistrict: 9 }, // 18 field reps
-    central: { districts: 7, fieldRepsPerDistrict: 9 }, // 63 field reps
-    east: { districts: 5, fieldRepsPerDistrict: 10 }, // 50 field reps
+    west: { districts: 6, fieldRepsPerDistrict: 10 }, // 60 field reps
+    east: { districts: 7, fieldRepsPerDistrict: 10 }, // 70 field reps
   };
 
   REGIONS.forEach((region) => {
@@ -265,6 +285,50 @@ const DESCRIPTORS = [
   "Timber & forestry equipment",
 ];
 
+const LOT_DESCRIPTORS = [
+  "John Deere 8320 Tractor", "Case IH 2588 Combine", "Grain Bin — 10,000 bu",
+  "Kinze 3600 Planter", "Flatbed Trailer — 40ft", "Chevy Silverado 2500HD",
+  "New Holland BR7090 Baler", "Grain Cart — 1000 bu", "Case IH Patriot Sprayer",
+  "Disc Harrow — 24ft", "Bobcat S650 Skid Steer", "CAT 320 Excavator",
+  "Peterbilt 367 Dump Truck", "100kW Diesel Generator", "Livestock Trailer — 24ft",
+  "Center Pivot Irrigation System", "Round Baler — Vermeer 605N", "Grain Auger — 10in x 71ft",
+];
+
+export type EstimateConfidence = "High" | "Medium" | "Low";
+
+export interface ListingItem {
+  id: string;
+  lotDescription: string;
+  estimatedGMV: number;
+  estimateConfidence: EstimateConfidence;
+  targetPrice: number;
+}
+
+/** Breaks a Listing's total value down into the individual lots/items that
+ * make it up — deterministic per listing, so re-expanding shows the same items. */
+export function getListingItems(listingId: string, listingValue: number): ListingItem[] {
+  const rng = mulberry32(hashStr(listingId + "-items"));
+  const count = 2 + Math.floor(rng() * 5); // 2-6 items
+  const confidenceLevels: EstimateConfidence[] = ["High", "Medium", "Low"];
+  const weights = Array.from({ length: count }, () => 0.5 + rng());
+  const totalWeight = weights.reduce((a, b) => a + b, 0) || 1;
+
+  return Array.from({ length: count }).map((_, i) => {
+    const share = weights[i] / totalWeight;
+    const estimatedGMV = Math.round(listingValue * share);
+    const confidence = confidenceLevels[Math.floor(rng() * confidenceLevels.length)];
+    const confidenceMultiplier =
+      confidence === "High" ? 0.97 + rng() * 0.06 : confidence === "Medium" ? 0.85 + rng() * 0.15 : 0.65 + rng() * 0.2;
+    return {
+      id: `${listingId}-item-${i}`,
+      lotDescription: LOT_DESCRIPTORS[Math.floor(rng() * LOT_DESCRIPTORS.length)],
+      estimatedGMV,
+      estimateConfidence: confidence,
+      targetPrice: Math.round(estimatedGMV * confidenceMultiplier),
+    };
+  });
+}
+
 export function getCountyRecord(fips: string, rawName: string): CountyRecord {
   const cached = countyCache.get(fips);
   if (cached) return cached;
@@ -324,6 +388,14 @@ export function getCountyListings(fips: string, countyName: string, stateAbbr: s
   (["prospect", "working", "signedReady", "closed"] as PipelineStage[]).forEach((stage) => {
     const amt = rec[stage];
     for (let i = 0; i < amt.count; i++) {
+      // Prospects haven't been slated for any specific auction yet — no name,
+      // no end date — but a likely category is still a reasonable guess.
+      // Everything further along the pipeline is tied to an actual auction,
+      // whether already sold there or expected to be added.
+      const auctionId = stage === "prospect" ? null : AUCTIONS[Math.floor(rng() * AUCTIONS.length)].id;
+      const auctionType = auctionId
+        ? AUCTIONS.find((a) => a.id === auctionId)?.auctionType ?? null
+        : AUCTION_TYPES[Math.floor(rng() * AUCTION_TYPES.length)];
       listings.push({
         id: `${fips}-${stage}-${i}`,
         fips,
@@ -333,9 +405,8 @@ export function getCountyListings(fips: string, countyName: string, stateAbbr: s
         stage,
         description: DESCRIPTORS[Math.floor(rng() * DESCRIPTORS.length)],
         value: Math.round((amt.value / Math.max(amt.count, 1)) * (0.7 + rng() * 0.6)),
-        // Only closed listings have actually sold at an auction — everything
-        // still upstream in the pipeline hasn't been assigned a sale yet.
-        auctionId: stage === "closed" ? AUCTIONS[Math.floor(rng() * AUCTIONS.length)].id : null,
+        auctionId,
+        auctionType,
       });
     }
   });
@@ -366,38 +437,116 @@ const AUCTION_NAMES = [
   "Southwest Irrigation Equipment", "Pacific Northwest Forestry",
 ];
 
-export const AUCTIONS: Auction[] = AUCTION_NAMES.map((name, i) => {
-  const rng = mulberry32(hashStr(name));
-  // Exactly one auction (deterministically, the last in the list) represents
-  // "Auction TBA" — everything else has a confirmed date. Previously this was
-  // an independent ~22% roll per auction, which produced several unscheduled
-  // entries; a single TBA placeholder is what the UI actually wants to show.
-  const scheduled = i !== AUCTION_NAMES.length - 1;
-  const weekOffset = i % 6;
-  const submittedCount = 8 + Math.floor(rng() * 40);
-  // Every submitted listing is currently either still being worked or has
-  // already been accepted — so working + accepted always equals submitted.
-  const acceptedCount = Math.floor(submittedCount * (0.2 + rng() * 0.35));
-  const workingCount = submittedCount - acceptedCount;
-  const avgLot = (8 + rng() * 22) * 1000;
-  const weekLabel = `Week of ${["Jul 14", "Jul 21", "Jul 28", "Aug 4", "Aug 11", "Aug 18"][weekOffset]}`;
-  return {
-    id: `auction-${i}`,
-    name: scheduled ? name : "Auction TBA",
-    scheduled,
-    week: scheduled ? weekLabel : `${weekLabel} (expected)`,
-    submittedCount,
-    workingCount,
-    acceptedCount,
-    submittedValue: Math.round(submittedCount * avgLot),
-    workingValue: Math.round(workingCount * avgLot),
-    acceptedValue: Math.round(acceptedCount * avgLot),
-  };
-});
+const AUCTION_TYPES: AuctionType[] = ["Single Seller", "Equipment", "At Risk"];
+
+function formatAuctionDate(d: Date): string {
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+/**
+ * Spans roughly a month back through 11 months forward, with a handful of
+ * real-dated auctions per month — enough density that filtering the
+ * Auctions tab by This Week/Month/Quarter/Year actually shows different
+ * subsets, rather than the same short list regardless of timeframe.
+ */
+function buildAuctions(): Auction[] {
+  const now = new Date();
+  const auctions: Auction[] = [];
+  let counter = 0;
+
+  for (let offset = 1; offset >= -11; offset--) {
+    const monthDate = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+    const monthLabel = `${monthDate.getFullYear()}-${monthDate.getMonth()}`;
+    const monthRng = mulberry32(hashStr(monthLabel + "-auction-count"));
+    const count = 2 + Math.floor(monthRng() * 5); // 2-6 auctions this month
+
+    for (let i = 0; i < count; i++) {
+      const aRng = mulberry32(hashStr(monthLabel + "-auction-" + i));
+      const day = 1 + Math.floor(aRng() * 27);
+      const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
+      const name = AUCTION_NAMES[Math.floor(aRng() * AUCTION_NAMES.length)];
+      const submittedCount = 8 + Math.floor(aRng() * 40);
+      const acceptedCount = Math.floor(submittedCount * (0.2 + aRng() * 0.35));
+      const workingCount = submittedCount - acceptedCount;
+      const avgLot = (8 + aRng() * 22) * 1000;
+      const endDateLabel = formatAuctionDate(date);
+
+      auctions.push({
+        id: `auction-${counter++}`,
+        name,
+        scheduled: true,
+        week: `Week of ${endDateLabel}`,
+        endDate: endDateLabel,
+        endDateTimestamp: date.getTime(),
+        auctionType: AUCTION_TYPES[Math.floor(aRng() * AUCTION_TYPES.length)],
+        submittedCount,
+        workingCount,
+        acceptedCount,
+        submittedValue: Math.round(submittedCount * avgLot),
+        workingValue: Math.round(workingCount * avgLot),
+        acceptedValue: Math.round(acceptedCount * avgLot),
+      });
+    }
+  }
+
+  // Exactly one "Auction TBA" — no confirmed date, shown regardless of
+  // whatever date-range filter is active since it doesn't have a real one.
+  const tbaRng = mulberry32(hashStr("auction-tba"));
+  const tbaExpected = new Date(now.getTime() + (14 + Math.floor(tbaRng() * 30)) * 24 * 60 * 60 * 1000);
+  const tbaSubmittedCount = 8 + Math.floor(tbaRng() * 40);
+  const tbaAcceptedCount = Math.floor(tbaSubmittedCount * (0.2 + tbaRng() * 0.35));
+  const tbaWorkingCount = tbaSubmittedCount - tbaAcceptedCount;
+  const tbaAvgLot = (8 + tbaRng() * 22) * 1000;
+  const tbaEndDateLabel = formatAuctionDate(tbaExpected);
+  auctions.push({
+    id: `auction-${counter++}`,
+    name: "Auction TBA",
+    scheduled: false,
+    week: `Week of ${tbaEndDateLabel} (expected)`,
+    endDate: tbaEndDateLabel,
+    endDateTimestamp: tbaExpected.getTime(),
+    auctionType: AUCTION_TYPES[Math.floor(tbaRng() * AUCTION_TYPES.length)],
+    submittedCount: tbaSubmittedCount,
+    workingCount: tbaWorkingCount,
+    acceptedCount: tbaAcceptedCount,
+    submittedValue: Math.round(tbaSubmittedCount * tbaAvgLot),
+    workingValue: Math.round(tbaWorkingCount * tbaAvgLot),
+    acceptedValue: Math.round(tbaAcceptedCount * tbaAvgLot),
+  });
+
+  return auctions;
+}
+
+export const AUCTIONS: Auction[] = buildAuctions();
 
 export function auctionById(id: string | null | undefined): Auction | undefined {
   if (!id) return undefined;
   return AUCTIONS.find((a) => a.id === id);
+}
+
+/**
+ * Auctions aren't inherently tied to a region/district in this data model —
+ * they're a separate national list. To support scoping the Auctions tab by
+ * region/district, each auction gets a deterministic attribution split
+ * across the two regions (summing to 1), and within a region, further split
+ * across that region's districts (summing to the region's share). This is
+ * illustrative attribution for the mock, not a claim about real geography.
+ */
+export function getAuctionRegionShare(auctionId: string, regionId: RegionId): number {
+  const rng = mulberry32(hashStr(auctionId + "-region-split"));
+  const westShare = 0.3 + rng() * 0.4; // 30-70%
+  return regionId === "west" ? westShare : 1 - westShare;
+}
+
+export function getAuctionDistrictShare(auctionId: string, districtId: string): number {
+  const district = REPS.find((r) => r.id === districtId && r.type === "district");
+  if (!district) return 0;
+  const regionShare = getAuctionRegionShare(auctionId, district.regionId);
+  const districtsInRegion = REPS.filter((r) => r.type === "district" && r.regionId === district.regionId);
+  const weights = districtsInRegion.map((d) => mulberry32(hashStr(auctionId + "-weight-" + d.id))());
+  const totalWeight = weights.reduce((a, b) => a + b, 0) || 1;
+  const idx = districtsInRegion.findIndex((d) => d.id === districtId);
+  return idx === -1 ? 0 : regionShare * (weights[idx] / totalWeight);
 }
 
 export function getAuctionWeeklyTrend(auctionId: string): AuctionWeekPoint[] {
@@ -438,6 +587,7 @@ export function getAuctionListings(auctionId: string): Listing[] {
       description: DESCRIPTORS[Math.floor(rng() * DESCRIPTORS.length)],
       value: Math.round((6 + rng() * 30) * 1000),
       auctionId,
+      auctionType: auction.auctionType,
     };
   });
 }
@@ -496,6 +646,38 @@ export function getCurrentQuarterMonths(): MonthTarget[] {
   const quarterStart = Math.floor(now.getMonth() / 3) * 3;
   const year = now.getFullYear();
   return [0, 1, 2].map((i) => ({ year, month: quarterStart + i }));
+}
+
+export type AuctionTimeframe = "week" | "month" | "quarter" | "year";
+
+/**
+ * Date range (as timestamps) for filtering the Auctions tab by the top-level
+ * timeframe selector: This Week = today through next week (~14 days), This
+ * Month = the calendar month, This Quarter = the calendar quarter, This Year
+ * = the calendar year.
+ */
+export function getTimeframeDateRange(timeframe: AuctionTimeframe): { start: number; end: number } {
+  const now = new Date();
+  if (timeframe === "week") {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const end = new Date(start.getTime() + 14 * 24 * 60 * 60 * 1000);
+    return { start: start.getTime(), end: end.getTime() };
+  }
+  if (timeframe === "month") {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    return { start: start.getTime(), end: end.getTime() };
+  }
+  if (timeframe === "quarter") {
+    const quarterStart = Math.floor(now.getMonth() / 3) * 3;
+    const start = new Date(now.getFullYear(), quarterStart, 1);
+    const end = new Date(now.getFullYear(), quarterStart + 3, 0, 23, 59, 59);
+    return { start: start.getTime(), end: end.getTime() };
+  }
+  // year
+  const start = new Date(now.getFullYear(), 0, 1);
+  const end = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+  return { start: start.getTime(), end: end.getTime() };
 }
 
 /**

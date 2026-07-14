@@ -49,6 +49,7 @@ const INITIAL_ZOOM = 4;
 
 export interface TerritoryMapHandle {
   resetView: () => void;
+  flyToState: (stateAbbr: string) => void;
 }
 
 interface TerritoryMapProps {
@@ -99,11 +100,32 @@ export const TerritoryMap = forwardRef<TerritoryMapHandle, TerritoryMapProps>(fu
 ) {
   const mapInstanceRef = useRef<L.Map | null>(null);
 
-  useImperativeHandle(ref, () => ({
-    resetView: () => {
-      mapInstanceRef.current?.flyTo(INITIAL_CENTER, INITIAL_ZOOM, { duration: 0.6 });
-    },
-  }));
+  useImperativeHandle(
+    ref,
+    () => ({
+      resetView: () => {
+        mapInstanceRef.current?.flyTo(INITIAL_CENTER, INITIAL_ZOOM, { duration: 0.6 });
+      },
+      flyToState: (stateAbbr: string) => {
+        if (!geo) return;
+        const bounds = L.latLngBounds([]);
+        for (const feature of geo.features) {
+          const fips = fipsFromFeature(feature as Feature<Geometry, GeoJsonProperties>);
+          if (FIPS_TO_STATE[fips.slice(0, 2)] !== stateAbbr) continue;
+          try {
+            const b = L.geoJSON(feature as any).getBounds();
+            if (b.isValid()) bounds.extend(b);
+          } catch {
+            // Skip malformed geometry for this county.
+          }
+        }
+        if (bounds.isValid()) {
+          mapInstanceRef.current?.flyToBounds(bounds, { padding: [40, 40], duration: 0.6 });
+        }
+      },
+    }),
+    [geo]
+  );
 
   if (!geo) {
     return (
@@ -139,8 +161,13 @@ export const TerritoryMap = forwardRef<TerritoryMapHandle, TerritoryMapProps>(fu
     const fips = fipsFromFeature(feature);
     const name = `${(feature.properties as any)?.NAME ?? "Unknown"} County`;
     const stateAbbr = FIPS_TO_STATE[fips.slice(0, 2)] ?? "";
+    const rec = getCountyRecord(fips, name);
+    const repName = rec.repId ? repById(rec.repId)?.name : null;
     layer.on("click", () => onSelectCounty(fips, name, stateAbbr));
-    layer.bindTooltip(`${name}, ${stateAbbr}`, { sticky: true });
+    layer.bindTooltip(
+      `<div class="text-xs"><strong>${name}, ${stateAbbr}</strong><br/>${repName ? `Rep: ${repName}` : "No rep assigned"}</div>`,
+      { sticky: true }
+    );
   };
 
   const selectedRec = selectedFips && selectedCountyMeta ? getCountyRecord(selectedFips, selectedCountyMeta.name) : null;
