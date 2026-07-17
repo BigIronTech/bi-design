@@ -55,6 +55,7 @@ export interface TerritoryMapHandle {
 interface TerritoryMapProps {
   geo: FeatureCollection | null;
   visibleRegions: RegionId[];
+  stateFilter?: string | null;
   selectedFips: string | null;
   selectedCountyMeta: { name: string; stateAbbr: string } | null;
   onSelectCounty: (fips: string, name: string, stateAbbr: string) => void;
@@ -95,7 +96,7 @@ function MapController({ mapRef }: { mapRef: React.MutableRefObject<L.Map | null
 }
 
 export const TerritoryMap = forwardRef<TerritoryMapHandle, TerritoryMapProps>(function TerritoryMap(
-  { geo, visibleRegions, selectedFips, selectedCountyMeta, onSelectCounty },
+  { geo, visibleRegions, stateFilter, selectedFips, selectedCountyMeta, onSelectCounty },
   ref
 ) {
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -141,7 +142,7 @@ export const TerritoryMap = forwardRef<TerritoryMapHandle, TerritoryMapProps>(fu
     const fips = fipsFromFeature(feature);
     const name = `${(feature.properties as any)?.NAME ?? "Unknown"} County`;
     const rec = getCountyRecord(fips, name);
-    const inScope = visibleRegions.includes(rec.regionId);
+    const inScope = visibleRegions.includes(rec.regionId) && (!stateFilter || rec.stateAbbr === stateFilter);
     const selected = selectedFips === fips;
     const status = countyStatus(rec);
     return {
@@ -188,7 +189,12 @@ export const TerritoryMap = forwardRef<TerritoryMapHandle, TerritoryMapProps>(fu
         {/* Remounting on selection/scope change forces react-leaflet to re-run
             style() per feature — GeoJSON layers don't auto-restyle when a prop
             changes without this. Fine at county-level feature counts (~3.1k). */}
-        <GeoJSON key={`${selectedFips ?? "none"}-${visibleRegions.join(",")}`} data={geo} style={style} onEachFeature={onEachFeature} />
+        <GeoJSON
+          key={`${selectedFips ?? "none"}-${visibleRegions.join(",")}-${stateFilter ?? "none"}`}
+          data={geo}
+          style={style}
+          onEachFeature={onEachFeature}
+        />
       </MapContainer>
 
       {selectedCountyMeta && (

@@ -7,7 +7,7 @@ import {
 import {
   TrendingUp, TrendingDown, Handshake, Gavel, ChevronDown, ChevronRight,
   CalendarClock, Target, X, ArrowLeft, CheckCircle2, FileText, Users, ArrowUp, ArrowDown, ArrowUpDown, RotateCcw,
-  Search, MapPin, ListFilter, Download,
+  Search, MapPin, ListFilter, Download, ExternalLink,
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -213,11 +213,101 @@ function StatCard({
   );
 }
 
+/** Small "this would link out" affordance used on auction/listing/lot
+ * references throughout the dashboard. Since there's no real external editor
+ * to deep-link into yet, clicking opens a modal explaining what would happen
+ * instead of silently doing nothing (or fighting with the row's own onClick,
+ * hence the stopPropagation). */
+function EditorLink({
+  label,
+  kind,
+  onOpen,
+}: {
+  label: React.ReactNode;
+  kind: "auction" | "listing" | "lot";
+  onOpen: (kind: "auction" | "listing" | "lot", label: string) => void;
+}) {
+  if (label == null || label === "" || label === "—") return <>{label}</>;
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen(kind, String(label));
+      }}
+      className="text-foreground underline-offset-2 hover:underline hover:text-slate-900"
+    >
+      {label}
+    </button>
+  );
+}
+
+/** Fires when an EditorLink is clicked — stands in for actually navigating to
+ * the (not-yet-built) auction/listing/lot editor. */
+function EditorOpeningModal({
+  state,
+  onClose,
+}: {
+  state: { kind: "auction" | "listing" | "lot"; label: string } | null;
+  onClose: () => void;
+}) {
+  if (!state) return null;
+  const kindLabel = state.kind === "auction" ? "Auction" : state.kind === "listing" ? "Listing" : "Lot";
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-lg border bg-background p-5 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2">
+          <ExternalLink className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold">Opening {kindLabel.toLowerCase()} editor…</h3>
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          A new page would open here to edit the {kindLabel.toLowerCase()}{" "}
+          <span className="font-medium text-foreground">"{state.label}"</span>.
+        </p>
+        <Button size="sm" className="mt-4 w-full" onClick={onClose}>
+          Got it
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Builds the header title off the selected timeframe, e.g. "Sales
+ * Forecasting for Q3 2026" or "Sales Forecasting for 2026". Anchored to
+ * today's date since these are rolling windows (this week/month/quarter/year),
+ * not a picked date range. */
+function getTimeframeTitle(timeframe: TimeframeId): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  if (timeframe === "week") {
+    const label = now.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return `Sales Forecasting for Week of ${label}, ${year}`;
+  }
+  if (timeframe === "month") {
+    return `Sales Forecasting for ${now.toLocaleDateString("en-US", { month: "long" })} ${year}`;
+  }
+  if (timeframe === "quarter") {
+    const q = Math.floor(now.getMonth() / 3) + 1;
+    return `Sales Forecasting for Q${q} ${year}`;
+  }
+  return `Sales Forecasting for ${year}`;
+}
+
 export default function SalesForecastingDashboard() {
   const [timeframe, setTimeframe] = useState<TimeframeId>("month");
   const [role, setRole] = useState<"forecaster" | "regional" | "district">("forecaster");
   const [teamId, setTeamId] = useState("all");
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Modal shown when an auction/listing/lot link is clicked anywhere on the page.
+  const [editorState, setEditorState] = useState<{ kind: "auction" | "listing" | "lot"; label: string } | null>(null);
+  const openEditor = (kind: "auction" | "listing" | "lot", label: string) => setEditorState({ kind, label });
+
+  // Captured once on load so "Updated as of" reflects when this data was pulled, not a live-ticking clock.
+  const [updatedAt] = useState(() => new Date());
 
   const [geo, setGeo] = useState<FeatureCollection | null>(null);
   const [geoError, setGeoError] = useState(false);
@@ -260,6 +350,10 @@ export default function SalesForecastingDashboard() {
   const [repFilterPopoverOpen, setRepFilterPopoverOpen] = useState(false);
   const [stateFilter, setStateFilter] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // Set when someone searches the map (Territories tab) and picks a state —
+  // narrows the map and the Reps & Territories table below to that state
+  // until cleared. Independent from the Overview tab's own state filter above.
+  const [mapStateFilter, setMapStateFilter] = useState<string | null>(null);
 
   // Reps & Territories table search (name / state / county)
   const [repSearchQuery, setRepSearchQuery] = useState("");
@@ -399,6 +493,39 @@ export default function SalesForecastingDashboard() {
     }
     return { totals, repRollups: rollups, countiesByRep: byRep, totalsByState: byState };
   }, [geo, visibleRegions, visibleRepIds]);
+
+  // Territories-tab-only view of the above, narrowed to mapStateFilter when
+  // set (from the map search). Kept separate from the Overview tab's own
+  // state filter so the two don't cross-affect each other.
+  const countiesByRepMapScoped = useMemo(() => {
+    if (!mapStateFilter) return countiesByRep;
+    const filtered = new Map<string, CountyRecord[]>();
+    for (const [repId, counties] of countiesByRep) {
+      const inState = counties.filter((c) => c.stateAbbr === mapStateFilter);
+      if (inState.length) filtered.set(repId, inState);
+    }
+    return filtered;
+  }, [countiesByRep, mapStateFilter]);
+
+  const repRollupsMapScoped = useMemo(() => {
+    if (!mapStateFilter) return repRollups;
+    const rollups = new Map<string, RepRollup>();
+    for (const [repId, counties] of countiesByRepMapScoped) {
+      const roll = counties.reduce(
+        (acc, c) => ({
+          repId,
+          counties: acc.counties + 1,
+          prospect: acc.prospect + c.prospect.value,
+          working: acc.working + c.working.value,
+          signedReady: acc.signedReady + c.signedReady.value,
+          closed: acc.closed + c.closed.value,
+        }),
+        { repId, counties: 0, prospect: 0, working: 0, signedReady: 0, closed: 0 } as RepRollup
+      );
+      rollups.set(repId, roll);
+    }
+    return rollups;
+  }, [countiesByRepMapScoped, mapStateFilter]);
 
   // The Overview "research" filters narrow just the KPI cards/trend below —
   // most specific wins: a single county > a single rep's book > a whole
@@ -588,12 +715,14 @@ export default function SalesForecastingDashboard() {
   const repTableRows = useMemo(() => {
     let reps = REPS.filter((r) => (r.type === "territory" || r.type === "independent") && visibleRegions.includes(r.regionId));
     if (visibleRepIds) reps = reps.filter((r) => visibleRepIds.has(r.id));
-    return reps.map((r) => {
-      const roll = repRollups.get(r.id) ?? { repId: r.id, counties: 0, prospect: 0, working: 0, signedReady: 0, closed: 0 };
-      const manager = repById(r.parentId);
-      return { rep: r, manager, roll, total: roll.prospect + roll.working + roll.signedReady + roll.closed };
-    });
-  }, [visibleRegions, visibleRepIds, repRollups]);
+    return reps
+      .map((r) => {
+        const roll = repRollupsMapScoped.get(r.id) ?? { repId: r.id, counties: 0, prospect: 0, working: 0, signedReady: 0, closed: 0 };
+        const manager = repById(r.parentId);
+        return { rep: r, manager, roll, total: roll.prospect + roll.working + roll.signedReady + roll.closed };
+      })
+      .filter((row) => !mapStateFilter || row.roll.counties > 0);
+  }, [visibleRegions, visibleRepIds, repRollupsMapScoped, mapStateFilter]);
 
   const repTableAccessors = {
     name: (r: (typeof repTableRows)[number]) => r.rep.name,
@@ -611,10 +740,10 @@ export default function SalesForecastingDashboard() {
     const q = repSearchQuery.trim().toLowerCase();
     return repTableRows.filter(({ rep }) => {
       if (rep.name.toLowerCase().includes(q)) return true;
-      const counties = countiesByRep.get(rep.id) ?? [];
+      const counties = countiesByRepMapScoped.get(rep.id) ?? [];
       return counties.some((c) => c.name.toLowerCase().includes(q) || c.stateAbbr.toLowerCase().includes(q));
     });
-  }, [repTableRows, repSearchQuery, countiesByRep]);
+  }, [repTableRows, repSearchQuery, countiesByRepMapScoped]);
 
   const sortedRepTableRows = useMemo(
     () => sortRows(repTableSearchFiltered, repTableSort.sort, repTableAccessors),
@@ -663,11 +792,11 @@ export default function SalesForecastingDashboard() {
 
   const expandedRepListings = useMemo(() => {
     if (!displayRepId) return [];
-    const repCounties = countiesByRep.get(displayRepId) ?? [];
+    const repCounties = countiesByRepMapScoped.get(displayRepId) ?? [];
     const rows: Array<ReturnType<typeof getCountyListings>[number]> = [];
     repCounties.forEach((c) => rows.push(...getCountyListings(c.fips, c.name, c.stateAbbr)));
     return rows.sort((a, b) => b.value - a.value);
-  }, [displayRepId, countiesByRep]);
+  }, [displayRepId, countiesByRepMapScoped]);
 
   const repBreakdownSort = useSort("value", "desc");
   const repBreakdownAccessors = {
@@ -849,8 +978,13 @@ export default function SalesForecastingDashboard() {
       {/* Header + filters */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Sales Forecasting</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{getTimeframeTitle(timeframe)}</h1>
           <p className="text-sm text-muted-foreground">Actual sales, work in progress, and prospecting across all territories</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Updated as of{" "}
+            {updatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })},{" "}
+            {updatedAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select value={role} onValueChange={handleRoleChange}>
@@ -858,9 +992,9 @@ export default function SalesForecastingDashboard() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="forecaster">Financial Forecaster</SelectItem>
-              <SelectItem value="regional">Regional Sales Manager</SelectItem>
-              <SelectItem value="district">District Sales Manager</SelectItem>
+              <SelectItem value="forecaster">Overall Forecast</SelectItem>
+              <SelectItem value="regional">Regional</SelectItem>
+              <SelectItem value="district">District</SelectItem>
             </SelectContent>
           </Select>
 
@@ -879,7 +1013,7 @@ export default function SalesForecastingDashboard() {
             </Select>
           )}
 
-          <div className="mx-1 h-5 w-px bg-border" />
+          <div className="mx-1 h-5 w-px bg-slate-400" />
 
           <Select value={timeframe} onValueChange={(v) => setTimeframe(v as TimeframeId)}>
             <SelectTrigger className="h-8 w-[140px] bg-white text-xs">
@@ -894,7 +1028,7 @@ export default function SalesForecastingDashboard() {
             </SelectContent>
           </Select>
 
-          <div className="mx-1 h-5 w-px bg-border" />
+          <div className="mx-1 h-5 w-px bg-slate-400" />
 
           <Button
             variant="outline"
@@ -1188,7 +1322,11 @@ export default function SalesForecastingDashboard() {
                                 <TableCell className="text-muted-foreground">
                                   {l.countyName}, {l.stateAbbr}
                                 </TableCell>
-                                {displayStage !== "prospect" && <TableCell>{l.description}</TableCell>}
+                                {displayStage !== "prospect" && (
+                                  <TableCell>
+                                    <EditorLink label={l.description} kind="listing" onOpen={openEditor} />
+                                  </TableCell>
+                                )}
                                 <TableCell className="text-muted-foreground">
                                   {l.repId ? (
                                     <button
@@ -1203,7 +1341,9 @@ export default function SalesForecastingDashboard() {
                                 </TableCell>
                                 {displayStage !== "prospect" ? (
                                   <>
-                                    <TableCell className="text-muted-foreground">{auction?.name ?? "—"}</TableCell>
+                                    <TableCell className="text-muted-foreground">
+                                      <EditorLink label={auction?.name ?? "—"} kind="auction" onOpen={openEditor} />
+                                    </TableCell>
                                     <TableCell className="text-muted-foreground">{auction?.endDate ?? "—"}</TableCell>
                                     <TableCell className="text-muted-foreground">{l.auctionType ?? "—"}</TableCell>
                                   </>
@@ -1409,52 +1549,69 @@ export default function SalesForecastingDashboard() {
                     </button>
                   </div>
                 </div>
-                <Popover open={mapSearchOpen} onOpenChange={setMapSearchOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" className="h-8 w-72 justify-start bg-white text-xs font-normal">
-                      <Search className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
-                      Search a state or county…
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-80 p-0 !z-[2000]" align="start">
-                    <Command shouldFilter={false}>
-                      <CommandInput placeholder="Type a state or county…" value={mapSearchQuery} onValueChange={setMapSearchQuery} />
-                      <CommandList>
-                        <CommandEmpty>{mapSearchQuery.trim().length < 2 ? "Type at least 2 characters…" : "No matches found."}</CommandEmpty>
-                        {mapSearchMatches.states.length > 0 && (
-                          <div className="px-2 pb-1 pt-2 text-[11px] font-medium text-muted-foreground">States</div>
-                        )}
-                        {mapSearchMatches.states.map((s) => (
-                          <CommandItem
-                            key={s.abbr}
-                            onSelect={() => {
-                              territoryMapRef.current?.flyToState(s.abbr);
-                              setMapSearchOpen(false);
-                            }}
-                          >
-                            <MapPin className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
-                            {s.name} ({s.abbr})
-                          </CommandItem>
-                        ))}
-                        {mapSearchMatches.counties.length > 0 && (
-                          <div className="px-2 pb-1 pt-2 text-[11px] font-medium text-muted-foreground">Counties</div>
-                        )}
-                        {mapSearchMatches.counties.map((c) => (
-                          <CommandItem
-                            key={c.fips}
-                            onSelect={() => {
-                              setSelectedFips(c.fips);
-                              setSelectedCountyMeta({ name: c.name, stateAbbr: c.stateAbbr });
-                              setMapSearchOpen(false);
-                            }}
-                          >
-                            {c.name}, {c.stateAbbr}
-                          </CommandItem>
-                        ))}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Popover open={mapSearchOpen} onOpenChange={setMapSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" role="combobox" className="h-8 w-72 justify-start bg-white text-xs font-normal">
+                        <Search className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                        Search a state or county…
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-0 !z-[2000]" align="start">
+                      <Command shouldFilter={false}>
+                        <CommandInput placeholder="Type a state or county…" value={mapSearchQuery} onValueChange={setMapSearchQuery} />
+                        <CommandList>
+                          <CommandEmpty>{mapSearchQuery.trim().length < 2 ? "Type at least 2 characters…" : "No matches found."}</CommandEmpty>
+                          {mapSearchMatches.states.length > 0 && (
+                            <div className="px-2 pb-1 pt-2 text-[11px] font-medium text-muted-foreground">States</div>
+                          )}
+                          {mapSearchMatches.states.map((s) => (
+                            <CommandItem
+                              key={s.abbr}
+                              onSelect={() => {
+                                territoryMapRef.current?.flyToState(s.abbr);
+                                setMapStateFilter(s.abbr);
+                                setMapSearchOpen(false);
+                              }}
+                            >
+                              <MapPin className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                              {s.name} ({s.abbr})
+                            </CommandItem>
+                          ))}
+                          {mapSearchMatches.counties.length > 0 && (
+                            <div className="px-2 pb-1 pt-2 text-[11px] font-medium text-muted-foreground">Counties</div>
+                          )}
+                          {mapSearchMatches.counties.map((c) => (
+                            <CommandItem
+                              key={c.fips}
+                              onSelect={() => {
+                                setSelectedFips(c.fips);
+                                setSelectedCountyMeta({ name: c.name, stateAbbr: c.stateAbbr });
+                                setMapSearchOpen(false);
+                              }}
+                            >
+                              {c.name}, {c.stateAbbr}
+                            </CommandItem>
+                          ))}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+
+                  {mapStateFilter && (
+                    <Badge variant="outline" className="h-8 gap-1.5 bg-white pl-2.5 pr-1.5 text-xs font-normal">
+                      <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                      Filtered to {STATE_NAMES[mapStateFilter] ?? mapStateFilter}
+                      <button
+                        onClick={() => setMapStateFilter(null)}
+                        className="ml-0.5 rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        title="Clear state filter"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="!py-2">
                 <div className="h-[520px]">
@@ -1462,6 +1619,7 @@ export default function SalesForecastingDashboard() {
                     ref={territoryMapRef}
                     geo={geo}
                     visibleRegions={visibleRegions}
+                    stateFilter={mapStateFilter}
                     selectedFips={selectedFips}
                     selectedCountyMeta={selectedCountyMeta}
                     onSelectCounty={(fips, name, stateAbbr) => {
@@ -1533,14 +1691,18 @@ export default function SalesForecastingDashboard() {
                             const auction = l.auctionId ? auctionById(l.auctionId) : undefined;
                             return (
                               <TableRow key={l.id}>
-                                <TableCell className="text-foreground">{l.description}</TableCell>
+                                <TableCell className="text-foreground">
+                                  <EditorLink label={l.description} kind="listing" onOpen={openEditor} />
+                                </TableCell>
                                 <TableCell>
                                   <Badge variant="outline" className={STAGE_BADGE_CLASS[l.stage]}>
                                     {STAGE_LABEL[l.stage]}
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="text-muted-foreground">{l.repId ? repById(l.repId)?.name : "Unassigned"}</TableCell>
-                                <TableCell className="text-muted-foreground">{auction?.name ?? "—"}</TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  <EditorLink label={auction?.name ?? "—"} kind="auction" onOpen={openEditor} />
+                                </TableCell>
                                 <TableCell className="text-muted-foreground">{auction?.endDate ?? "—"}</TableCell>
                                 <TableCell className="text-muted-foreground">{l.auctionType ?? "—"}</TableCell>
                                 <TableCell className="text-right font-medium">{fmtMoney(l.value)}</TableCell>
@@ -1610,7 +1772,7 @@ export default function SalesForecastingDashboard() {
                 <TableBody>
                   {sortedRepTableRows.map(({ rep, manager, roll, total }) => {
                     const isOpen = expandedRepId === rep.id;
-                    const repCounties = countiesByRep.get(rep.id) ?? [];
+                    const repCounties = countiesByRepMapScoped.get(rep.id) ?? [];
                     return (
                       <Fragment key={rep.id}>
                         <TableRow
@@ -1705,13 +1867,17 @@ export default function SalesForecastingDashboard() {
                                                 <TableCell className="text-muted-foreground">
                                                   {l.countyName}, {l.stateAbbr}
                                                 </TableCell>
-                                                <TableCell>{l.description}</TableCell>
+                                                <TableCell>
+                                                  <EditorLink label={l.description} kind="listing" onOpen={openEditor} />
+                                                </TableCell>
                                                 <TableCell>
                                                   <Badge variant="outline" className={STAGE_BADGE_CLASS[l.stage]}>
                                                     {STAGE_LABEL[l.stage]}
                                                   </Badge>
                                                 </TableCell>
-                                                <TableCell className="text-muted-foreground">{auction?.name ?? "—"}</TableCell>
+                                                <TableCell className="text-muted-foreground">
+                                                  <EditorLink label={auction?.name ?? "—"} kind="auction" onOpen={openEditor} />
+                                                </TableCell>
                                                 <TableCell className="text-muted-foreground">{auction?.endDate ?? "—"}</TableCell>
                                                 <TableCell className="text-muted-foreground">{l.auctionType ?? "—"}</TableCell>
                                                 <TableCell className="text-right font-medium">{fmtMoney(l.value)}</TableCell>
@@ -1817,7 +1983,7 @@ export default function SalesForecastingDashboard() {
                         >
                           <TableCell className="font-medium">
                             <span className="inline-flex items-center gap-1.5">
-                              {a.name}
+                              <EditorLink label={a.name} kind="auction" onOpen={openEditor} />
                               {!a.scheduled && <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">TBA</Badge>}
                             </span>
                           </TableCell>
@@ -1845,27 +2011,45 @@ export default function SalesForecastingDashboard() {
               </Card>
             </>
           ) : (
-            <AuctionDetail auctionId={selectedAuction.id} onBack={() => setSelectedAuctionId(null)} />
+            <AuctionDetail auctionId={selectedAuction.id} onBack={() => setSelectedAuctionId(null)} onOpenEditor={openEditor} />
           )}
         </TabsContent>
       </Tabs>
+
+      <EditorOpeningModal state={editorState} onClose={() => setEditorState(null)} />
     </div>
   );
 }
 
 /* ---------------------------------------------------------------------- */
 
-function AuctionDetail({ auctionId, onBack }: { auctionId: string; onBack: () => void }) {
+function AuctionDetail({
+  auctionId,
+  onBack,
+  onOpenEditor,
+}: {
+  auctionId: string;
+  onBack: () => void;
+  onOpenEditor: (kind: "auction" | "listing" | "lot", label: string) => void;
+}) {
   const auction = AUCTIONS.find((a) => a.id === auctionId)!;
   const trend = getAuctionWeeklyTrend(auctionId);
   const listings = getAuctionListings(auctionId);
   const [expandedListingId, setExpandedListingId] = useState<string | null>(null);
+
+  // Same convention as the Reps & Territories table: a rep's "District Manager" is repById(rep.parentId).
+  const managerName = (repId: string | null | undefined) => {
+    if (!repId) return null;
+    const rep = repById(repId);
+    return rep ? repById(rep.parentId)?.name ?? null : null;
+  };
 
   const listingsSort = useSort("value", "desc");
   const listingsAccessors = {
     description: (l: (typeof listings)[number]) => l.description,
     stage: (l: (typeof listings)[number]) => l.stage,
     rep: (l: (typeof listings)[number]) => (l.repId ? repById(l.repId)?.name ?? "" : ""),
+    manager: (l: (typeof listings)[number]) => managerName(l.repId) ?? "",
     value: (l: (typeof listings)[number]) => l.value,
   };
   const sortedListings = sortRows(listings, listingsSort.sort, listingsAccessors);
@@ -1930,6 +2114,7 @@ function AuctionDetail({ auctionId, onBack }: { auctionId: string; onBack: () =>
                   <SortableHead label="Listing" sortKey="description" sort={listingsSort.sort} onSort={listingsSort.onSort} />
                   <SortableHead label="Stage" sortKey="stage" sort={listingsSort.sort} onSort={listingsSort.onSort} />
                   <SortableHead label="Rep" sortKey="rep" sort={listingsSort.sort} onSort={listingsSort.onSort} />
+                  <SortableHead label="District Manager" sortKey="manager" sort={listingsSort.sort} onSort={listingsSort.onSort} />
                   <SortableHead label="Value" sortKey="value" sort={listingsSort.sort} onSort={listingsSort.onSort} align="right" />
                 </TableRow>
               </TableHeader>
@@ -1943,7 +2128,7 @@ function AuctionDetail({ auctionId, onBack }: { auctionId: string; onBack: () =>
                         <TableCell>
                           <span className="inline-flex items-center gap-1.5">
                             {isOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-                            {l.description}
+                            <EditorLink label={l.description} kind="listing" onOpen={onOpenEditor} />
                           </span>
                         </TableCell>
                         <TableCell>
@@ -1952,10 +2137,11 @@ function AuctionDetail({ auctionId, onBack }: { auctionId: string; onBack: () =>
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">{l.repId ? repById(l.repId)?.name : "Unassigned"}</TableCell>
+                        <TableCell className="text-muted-foreground">{managerName(l.repId) ?? "—"}</TableCell>
                         <TableCell className="text-right font-medium">{fmtMoney(l.value)}</TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell colSpan={4} className="p-0">
+                        <TableCell colSpan={5} className="p-0">
                           <div className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
                             <div className="min-h-0 overflow-hidden">
                               <div className="border-t bg-muted/30 p-3">
@@ -1973,7 +2159,9 @@ function AuctionDetail({ auctionId, onBack }: { auctionId: string; onBack: () =>
                                     <TableBody>
                                       {items.map((item) => (
                                         <TableRow key={item.id}>
-                                          <TableCell>{item.lotDescription}</TableCell>
+                                          <TableCell>
+                                            <EditorLink label={item.lotDescription} kind="lot" onOpen={onOpenEditor} />
+                                          </TableCell>
                                           <TableCell className="text-right">{fmtMoney(item.estimatedGMV)}</TableCell>
                                           <TableCell>
                                             <Badge
