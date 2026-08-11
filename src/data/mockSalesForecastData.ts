@@ -12,6 +12,12 @@
 
 export type PipelineStage = "prospect" | "working" | "signedReady" | "closed";
 
+/** The 5-phase Overview funnel. `PipelineStage` still drives Territories/
+ * Auctions/map data untouched — here `prospect` is split into
+ * `unvaluedProspect` and `valuedProspect` so the Overview cards can surface
+ * the valuation step as its own phase. */
+export type FunnelPhase = "unvaluedProspect" | "valuedProspect" | "working" | "signedReady" | "closed";
+
 export type RepType = "regional" | "district" | "territory" | "independent";
 
 export interface Rep {
@@ -35,12 +41,25 @@ export interface CountyRecord {
   stateAbbr: string;
   regionId: RegionId;
   repId: string | null;
+  /** Combined prospect total (unvaluedProspect + valuedProspect) — kept for existing map/rep-table consumers. */
   prospect: StageAmount;
+  /** Split of `prospect` — prospects not yet assigned an estimated value. */
+  unvaluedProspect: StageAmount;
+  /** Split of `prospect` — prospects that have been valued. unvaluedProspect.count + valuedProspect.count === prospect.count. */
+  valuedProspect: StageAmount;
   working: StageAmount;
   signedReady: StageAmount;
   closed: StageAmount;
+  /** Unvalued prospects that dropped out of the funnel before ever being valued — no dollar value, since they were never valued. */
+  unvaluedProspectLeakageCount: number;
+  /** Valued prospects that dropped out before converting to an Unsigned Listing. A count only — leakage $ value is derived from the actual tagged Listing records (see getCountyListings), never stored/randomized separately, so a zero count always implies a zero value. */
+  valuedProspectLeakageCount: number;
+  /** Unsigned Listings that dropped out before becoming Signed Listings. Count only, same reasoning as above. */
+  workingLeakageCount: number;
+  /** Signed Listings that dropped out before becoming Sold Actuals. Count only, same reasoning as above. */
+  signedReadyLeakageCount: number;
   priorYearClosed: number;
-  /** Target GMV for this county for the current period — the "goal" the bars in the UI measure progress against. */
+  /** Target GTV for this county for the current period — the "goal" the bars in the UI measure progress against. */
   budget: number;
 }
 
@@ -56,20 +75,62 @@ export interface Listing {
   auctionId: string | null;
   /** Known even for prospects (a likely category), unlike auctionId/end date which aren't decided yet for them. */
   auctionType: AuctionType | null;
+  /** Only meaningful when stage === "prospect": whether this prospect has been valued yet (splits Unvalued/Valued Prospects). */
+  valued?: boolean;
+  /** Meaningful for stage === "prospect" (valued only), "working", and "signedReady": whether this specific listing is the one counted in that phase's Leakage metric (dropped out rather than advancing). Undefined/false = still active. */
+  leaked?: boolean;
+  /** When the seller was first contacted. Not set for Sold Actuals (closed) — that table shows Auction End Date instead. */
+  contactDate?: string;
+  contactDateTimestamp?: number;
+  /** When the seller signed. Only set for stage "signedReady" and "closed" — the two phases where a signature has actually happened. Always defined for those two stages, never blank. */
+  signedDate?: string;
+  signedDateTimestamp?: number;
+  /** When the item actually sold. Only set for stage "closed" — always defined there, never blank. */
+  soldDate?: string;
+  soldDateTimestamp?: number;
+  /** Seller's commission terms for this listing. */
+  commissionOption: CommissionOption;
+  /** The equipment/asset category. */
+  vertical: Vertical;
+  /** Who's selling. */
+  sellerType: SellerType;
+  /** Latest appraised/actual value — distinct from `value` (the estimated GTV) so a Variance can be shown. Always set for county-sourced listings; for auction-sourced listings, only set once the item has actually sold (stage "closed"). */
+  actualValue?: number;
 }
 
-export type AuctionType = "Single Seller" | "Equipment" | "At Risk";
+export type CommissionOption = "Straight Commission" | "Flat Fee" | "Reserve + Commission" | "Buyer's Premium Split";
+export type Vertical =
+  | "Row Crop & Tillage"
+  | "Cattle & Livestock"
+  | "Grain Handling & Storage"
+  | "Construction & Excavation"
+  | "Dairy"
+  | "Hay & Forage"
+  | "Irrigation"
+  | "Harvest Equipment"
+  | "Trucks & Trailers"
+  | "Timber & Forestry";
+export type SellerType = "Private Owner" | "Dealer / Retailer" | "Bank / Lender" | "Estate" | "Municipality / Government" | "Corporate Fleet";
+
+export type AuctionType = "Equipment" | "Livestock" | "Realty" | "Sullivan Classic Cars" | "Sullivan Equipment" | "Private";
+
+export type EventType = "Single Seller" | "Multi-Seller";
+export type LineOfBusiness = "Agriculture" | "Collector Cars" | "Const/Trans" | "Livestock" | "Real Estate";
 
 export interface Auction {
   id: string;
   name: string;
   scheduled: boolean;
+  /** True once the auction's date has actually passed — only closed auctions ever have Actual GTV/sold listings. Auction TBA is never closed (no confirmed date yet). */
+  closed: boolean;
   week: string;
   /** Formatted end date (or expected end date, for the TBA auction). */
   endDate: string;
   /** Raw timestamp backing `endDate` — lets the UI filter by real date ranges (week/month/quarter/year) instead of parsing the formatted string. */
   endDateTimestamp: number;
   auctionType: AuctionType;
+  eventType: EventType;
+  lineOfBusiness: LineOfBusiness;
   submittedCount: number;
   workingCount: number;
   acceptedCount: number;
@@ -220,53 +281,183 @@ function fipsAndStateFromFeature(feature: any): { fips: string; stateAbbr: strin
   return { fips, stateAbbr: FIPS_TO_STATE[fips.slice(0, 2)] ?? "US" };
 }
 
+type LngLat = [number, number];
+
+/** Bounding-box center of a county's geometry — fast and good enough for
+ * clustering purposes (doesn't need true area-weighted polygon centroids). */
+function centroidOfFeature(feature: any): LngLat | null {
+  const geom = feature?.geometry;
+  if (!geom) return null;
+  let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+  const visit = (coords: any, depth: number) => {
+    if (depth === 0) {
+      const [lng, lat] = coords;
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+    } else {
+      for (const c of coords) visit(c, depth - 1);
+    }
+  };
+  const depth = geom.type === "Polygon" ? 2 : geom.type === "MultiPolygon" ? 3 : -1;
+  if (depth < 0) return null;
+  visit(geom.coordinates, depth);
+  if (!isFinite(minLng) || !isFinite(minLat)) return null;
+  return [(minLng + maxLng) / 2, (minLat + maxLat) / 2];
+}
+
+/** Groups counties into `k` geographically-contiguous clusters via a small
+ * deterministic k-means pass over their centroids — seeded by spreading
+ * initial centers across a longitude sort (rather than randomly), so
+ * clusters separate cleanly from the first iteration instead of needing many
+ * passes to untangle a random start. Used so each district ends up as one
+ * compact patch of neighboring counties instead of scattered picks across
+ * the whole region. */
+function clusterByGeography(entries: { fips: string; centroid: LngLat }[], k: number): string[][] {
+  if (entries.length === 0 || k <= 0) return [];
+  if (k >= entries.length) return entries.map((e) => [e.fips]);
+
+  const byLng = [...entries].sort((a, b) => a.centroid[0] - b.centroid[0]);
+  const seeds: LngLat[] = Array.from({ length: k }, (_, i) => {
+    const idx = Math.min(Math.floor((i + 0.5) * (byLng.length / k)), byLng.length - 1);
+    return [...byLng[idx].centroid];
+  });
+
+  const assignment = new Array(entries.length).fill(0);
+  for (let iter = 0; iter < 8; iter++) {
+    for (let i = 0; i < entries.length; i++) {
+      const [lng, lat] = entries[i].centroid;
+      let best = 0;
+      let bestDist = Infinity;
+      for (let s = 0; s < seeds.length; s++) {
+        const dLng = lng - seeds[s][0];
+        const dLat = lat - seeds[s][1];
+        const dist = dLng * dLng + dLat * dLat;
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = s;
+        }
+      }
+      assignment[i] = best;
+    }
+    const sums: [number, number, number][] = Array.from({ length: k }, () => [0, 0, 0]);
+    for (let i = 0; i < entries.length; i++) {
+      const s = sums[assignment[i]];
+      s[0] += entries[i].centroid[0];
+      s[1] += entries[i].centroid[1];
+      s[2] += 1;
+    }
+    for (let s = 0; s < k; s++) {
+      if (sums[s][2] > 0) seeds[s] = [sums[s][0] / sums[s][2], sums[s][1] / sums[s][2]];
+    }
+  }
+
+  const clusters: string[][] = Array.from({ length: k }, () => []);
+  for (let i = 0; i < entries.length; i++) clusters[assignment[i]].push(entries[i].fips);
+  return clusters;
+}
+
 /**
  * Run once (idempotent) against the full county GeoJSON before any
- * getCountyRecord() calls that need real rep coverage. Each rep is given a
- * deterministic, skewed-low random target between 1 and MAX_COUNTIES_PER_REP
- * (product of two uniforms → averages ~3-4, occasionally reaches the cap) —
- * matching a realistic territory size instead of every rep maxing out.
- * Counties left over once every rep in a region has been assigned their
- * target stay unassigned — open prospecting territory, same as before.
+ * getCountyRecord() calls that need real rep coverage. Counties are first
+ * clustered geographically into each region's districts (so a district is
+ * always one contiguous patch of neighboring counties, never scattered
+ * picks), then — within its own district's cluster only — each field rep is
+ * given a deterministic, skewed-low random target between 1 and
+ * MAX_COUNTIES_PER_REP (product of two uniforms → averages ~3-4,
+ * occasionally reaches the cap) — matching a realistic territory size
+ * instead of every rep maxing out. Counties left over once every rep in a
+ * district has been assigned their target stay unassigned — open
+ * prospecting territory, same as before.
  */
+/**
+ * Grows one contiguous, adjacent county group per rep out of a district's
+ * own (already-contiguous) pool — a simple nearest-neighbor territory-growth
+ * pass: each rep gets a deterministic seed county, then repeatedly claims
+ * whichever unclaimed county is nearest to its territory-so-far, until it
+ * hits its target size or the pool runs out. Reps with bigger targets go
+ * first so they're not left fragmenting whatever's left over.
+ */
+function growContiguousTerritories(
+  clusterFips: string[],
+  centroidByFips: Map<string, LngLat>,
+  repTargets: { repId: string; target: number }[]
+): Map<string, string> {
+  const remaining = new Set(clusterFips);
+  const assignment = new Map<string, string>();
+  const ordered = [...repTargets].sort((a, b) => b.target - a.target);
+
+  for (const { repId, target } of ordered) {
+    if (remaining.size === 0) break;
+    const remainingArr = Array.from(remaining);
+    const seedIdx = Math.floor(mulberry32(hashStr(repId + "-seed"))() * remainingArr.length);
+    const seedFips = remainingArr[seedIdx];
+    const territory: string[] = [seedFips];
+    remaining.delete(seedFips);
+
+    while (territory.length < target && remaining.size > 0) {
+      let best: string | null = null;
+      let bestDist = Infinity;
+      for (const cand of remaining) {
+        const [clng, clat] = centroidByFips.get(cand) ?? [0, 0];
+        for (const t of territory) {
+          const [tlng, tlat] = centroidByFips.get(t) ?? [0, 0];
+          const d = (clng - tlng) ** 2 + (clat - tlat) ** 2;
+          if (d < bestDist) {
+            bestDist = d;
+            best = cand;
+          }
+        }
+      }
+      if (best == null) break;
+      territory.push(best);
+      remaining.delete(best);
+    }
+    for (const f of territory) assignment.set(f, repId);
+  }
+  return assignment;
+}
+
 export function primeCountyAssignments(geo: { features: any[] }) {
   if (assignmentsComputed) return;
 
-  const byRegion = new Map<RegionId, string[]>();
+  const byRegion = new Map<RegionId, { fips: string; centroid: LngLat }[]>();
+  const centroidByFips = new Map<string, LngLat>();
   for (const feature of geo.features) {
     const { fips, stateAbbr } = fipsAndStateFromFeature(feature);
     const region = regionForState(stateAbbr);
+    const centroid = centroidOfFeature(feature) ?? [0, 0];
+    centroidByFips.set(fips, centroid);
     const list = byRegion.get(region) ?? [];
-    list.push(fips);
+    list.push({ fips, centroid });
     byRegion.set(region, list);
   }
 
   REGIONS.forEach((region) => {
-    const fipsList = byRegion.get(region.id) ?? [];
-    // Deterministic shuffle so assignment doesn't depend on GeoJSON feature order.
-    const shuffled = fipsList
-      .map((f) => ({ f, key: mulberry32(hashStr(f + "-shuffle"))() }))
-      .sort((a, b) => a.key - b.key)
-      .map((x) => x.f);
+    const entries = byRegion.get(region.id) ?? [];
+    const districts = REPS.filter((r) => r.type === "district" && r.regionId === region.id);
+    const clusters = clusterByGeography(entries, districts.length);
 
-    const reps = repsByRegion(region.id);
-    let cursor = 0;
-    for (const rep of reps) {
-      const skewRng = mulberry32(hashStr(rep.id + "-territory-size"));
-      // sqrt(uniform) skews toward the higher end (average ~0.67 vs 0.5 for a
-      // plain uniform) — still respects the 1-11 cap, but assigns meaningfully
-      // more counties overall than the earlier low-skewed version.
-      const skewed = Math.sqrt(skewRng());
-      const target = Math.min(MAX_COUNTIES_PER_REP, Math.max(1, Math.round(1 + skewed * (MAX_COUNTIES_PER_REP - 1))));
-      for (let k = 0; k < target && cursor < shuffled.length; k++) {
-        repAssignment.set(shuffled[cursor], rep.id);
-        cursor++;
+    districts.forEach((dm, di) => {
+      const clusterFips = clusters[di] ?? [];
+
+      const fieldReps = REPS.filter((r) => r.parentId === dm.id && (r.type === "territory" || r.type === "independent"));
+      const repTargets = fieldReps.map((rep) => {
+        const skewRng = mulberry32(hashStr(rep.id + "-territory-size"));
+        const skewed = Math.sqrt(skewRng());
+        const target = Math.min(MAX_COUNTIES_PER_REP, Math.max(1, Math.round(1 + skewed * (MAX_COUNTIES_PER_REP - 1))));
+        return { repId: rep.id, target };
+      });
+
+      // Territories are themselves contiguous, adjacent county groups —
+      // grown geographically within the district's own cluster, not sliced
+      // off a shuffled list.
+      const assignment = growContiguousTerritories(clusterFips, centroidByFips, repTargets);
+      for (const fips of clusterFips) {
+        repAssignment.set(fips, assignment.get(fips) ?? null);
       }
-    }
-    // Anything past `cursor` never got assigned — stays unassigned/prospecting.
-    for (; cursor < shuffled.length; cursor++) {
-      repAssignment.set(shuffled[cursor], null);
-    }
+    });
   });
 
   assignmentsComputed = true;
@@ -294,19 +485,41 @@ const LOT_DESCRIPTORS = [
   "Center Pivot Irrigation System", "Round Baler — Vermeer 605N", "Grain Auger — 10in x 71ft",
 ];
 
+const COMMISSION_OPTIONS: CommissionOption[] = ["Straight Commission", "Flat Fee", "Reserve + Commission", "Buyer's Premium Split"];
+const VERTICALS: Vertical[] = [
+  "Row Crop & Tillage", "Cattle & Livestock", "Grain Handling & Storage", "Construction & Excavation",
+  "Dairy", "Hay & Forage", "Irrigation", "Harvest Equipment", "Trucks & Trailers", "Timber & Forestry",
+];
+const SELLER_TYPES: SellerType[] = ["Private Owner", "Dealer / Retailer", "Bank / Lender", "Estate", "Municipality / Government", "Corporate Fleet"];
+
 export type EstimateConfidence = "High" | "Medium" | "Low";
 
 export interface ListingItem {
   id: string;
+  /** Lot # — 2 letters + 4 digits, e.g. "KH7260". */
+  lotNumber: string;
   lotDescription: string;
-  estimatedGMV: number;
+  estimatedGTV: number;
   estimateConfidence: EstimateConfidence;
-  targetPrice: number;
+  /** Not every lot has a target set yet — undefined means untargeted. */
+  targetPrice?: number;
+  /** Only set once the lot has actually sold — never present otherwise (e.g. Auction TBA, or any not-yet-closed auction). */
+  actualGTV?: number;
+}
+
+const LOT_NUMBER_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I/O, avoids look-alikes
+
+function makeLotNumber(rng: () => number): string {
+  const letter = () => LOT_NUMBER_LETTERS[Math.floor(rng() * LOT_NUMBER_LETTERS.length)];
+  const digits = String(Math.floor(rng() * 10000)).padStart(4, "0");
+  return `${letter()}${letter()}${digits}`;
 }
 
 /** Breaks a Listing's total value down into the individual lots/items that
- * make it up — deterministic per listing, so re-expanding shows the same items. */
-export function getListingItems(listingId: string, listingValue: number): ListingItem[] {
+ * make it up — deterministic per listing, so re-expanding shows the same
+ * items. `sold` gates whether a lot gets an Actual GTV at all — only items
+ * that have actually sold ever get one. */
+export function getListingItems(listingId: string, listingValue: number, sold: boolean): ListingItem[] {
   const rng = mulberry32(hashStr(listingId + "-items"));
   const count = 2 + Math.floor(rng() * 5); // 2-6 items
   const confidenceLevels: EstimateConfidence[] = ["High", "Medium", "Low"];
@@ -315,16 +528,20 @@ export function getListingItems(listingId: string, listingValue: number): Listin
 
   return Array.from({ length: count }).map((_, i) => {
     const share = weights[i] / totalWeight;
-    const estimatedGMV = Math.round(listingValue * share);
+    const estimatedGTV = Math.round(listingValue * share);
     const confidence = confidenceLevels[Math.floor(rng() * confidenceLevels.length)];
     const confidenceMultiplier =
       confidence === "High" ? 0.97 + rng() * 0.06 : confidence === "Medium" ? 0.85 + rng() * 0.15 : 0.65 + rng() * 0.2;
+    // About 1 in 5 lots hasn't had a target set yet.
+    const hasTarget = rng() > 0.2;
     return {
       id: `${listingId}-item-${i}`,
+      lotNumber: makeLotNumber(rng),
       lotDescription: LOT_DESCRIPTORS[Math.floor(rng() * LOT_DESCRIPTORS.length)],
-      estimatedGMV,
+      estimatedGTV,
       estimateConfidence: confidence,
-      targetPrice: Math.round(estimatedGMV * confidenceMultiplier),
+      targetPrice: hasTarget ? Math.round(estimatedGTV * confidenceMultiplier) : undefined,
+      actualGTV: sold ? Math.round(estimatedGTV * (0.85 + rng() * 0.3)) : undefined,
     };
   });
 }
@@ -357,19 +574,45 @@ export function getCountyRecord(fips: string, rawName: string): CountyRecord {
     value: Math.round(base * mult * (0.4 + rng() * 1.2)),
   });
 
+  // Assigned counties always may carry prospect value. Unassigned counties
+  // only get one ~18% of the time — otherwise every gray (no-rep) county
+  // would show a prospect signal, which is the opposite of "sprinkled."
+  const prospectAmt = rep ? mk(0.9, 4) : rng() < 0.18 ? mk(0.9, 4) : { count: 0, value: 0 };
+  const workingAmt = rep ? mk(0.6, 3) : { count: 0, value: 0 };
+  const signedReadyAmt = rep ? mk(0.75, 2) : { count: 0, value: 0 };
+  const closedAmt = rep ? mk(1.1, 3) : { count: 0, value: 0 };
+
+  // Split prospects into unvalued vs. valued — valued prospects have had an
+  // estimate produced, unvalued ones are still waiting. Share is randomized
+  // per-county in a moderate band so no county is ever 100% one or the other.
+  const valuedShare = 0.35 + rng() * 0.35; // ~35%-70% of prospects already valued
+  const valuedProspectCount = Math.min(prospectAmt.count, Math.round(prospectAmt.count * valuedShare));
+  const unvaluedProspectCount = prospectAmt.count - valuedProspectCount;
+  const valuedProspectValue = Math.round(prospectAmt.value * valuedShare);
+
   const record: CountyRecord = {
     fips,
     name: rawName,
     stateAbbr,
     regionId,
     repId: rep ? rep.id : null,
-    // Assigned counties always may carry prospect value. Unassigned counties
-    // only get one ~18% of the time — otherwise every gray (no-rep) county
-    // would show a prospect signal, which is the opposite of "sprinkled."
-    prospect: rep ? mk(0.9, 4) : rng() < 0.18 ? mk(0.9, 4) : { count: 0, value: 0 },
-    working: rep ? mk(0.6, 3) : { count: 0, value: 0 },
-    signedReady: rep ? mk(0.75, 2) : { count: 0, value: 0 },
-    closed: rep ? mk(1.1, 3) : { count: 0, value: 0 },
+    prospect: prospectAmt,
+    // Unvalued prospects carry no dollar figure — they haven't been valued yet.
+    unvaluedProspect: { count: unvaluedProspectCount, value: 0 },
+    valuedProspect: { count: valuedProspectCount, value: valuedProspectValue },
+    working: workingAmt,
+    signedReady: signedReadyAmt,
+    closed: closedAmt,
+    // Leakage: rare, by design — most counties/phases have zero leaked
+    // listings; a small fraction have exactly one. Counts only —
+    // getCountyListings tags the corresponding number of actual Listing
+    // records as `leaked`, and the dashboard derives Leakage $ value by
+    // summing those real records' values, so a zero leakage count always
+    // means a zero leakage value.
+    unvaluedProspectLeakageCount: unvaluedProspectCount > 0 && rng() < 0.012 ? 1 : 0,
+    valuedProspectLeakageCount: valuedProspectCount > 0 && rng() < 0.012 ? 1 : 0,
+    workingLeakageCount: workingAmt.count > 0 && rng() < 0.009 ? 1 : 0,
+    signedReadyLeakageCount: signedReadyAmt.count > 0 && rng() < 0.006 ? 1 : 0,
     priorYearClosed: 0,
     budget: 0,
   };
@@ -390,12 +633,54 @@ export function getCountyListings(fips: string, countyName: string, stateAbbr: s
     for (let i = 0; i < amt.count; i++) {
       // Prospects haven't been slated for any specific auction yet — no name,
       // no end date — but a likely category is still a reasonable guess.
-      // Everything further along the pipeline is tied to an actual auction,
-      // whether already sold there or expected to be added.
-      const auctionId = stage === "prospect" ? null : AUCTIONS[Math.floor(rng() * AUCTIONS.length)].id;
+      // Unsigned Listings haven't signed onto a real sale yet either, so
+      // they're always pinned to the single unscheduled Auction TBA.
+      // Everything past that point is tied to a real dated auction.
+      const auctionId = stage === "prospect" ? null : stage === "working" ? TBA_AUCTION.id : AUCTIONS[Math.floor(rng() * AUCTIONS.length)].id;
       const auctionType = auctionId
         ? AUCTIONS.find((a) => a.id === auctionId)?.auctionType ?? null
-        : AUCTION_TYPES[Math.floor(rng() * AUCTION_TYPES.length)];
+        : AUCTION_TYPE_POOL[Math.floor(rng() * AUCTION_TYPE_POOL.length)];
+
+      // Valued/unvalued split (prospects only) and the Leakage tag (valued
+      // prospects, Unsigned Listings, Signed Listings) are both deterministic
+      // "first N of this block" assignments — matches the counts computed in
+      // getCountyRecord so a phase's Leakage Count always equals the number
+      // of listings actually tagged `leaked` in that phase.
+      let valued: boolean | undefined;
+      let leaked: boolean | undefined;
+      if (stage === "prospect") {
+        valued = i < rec.valuedProspect.count;
+        leaked = valued ? i < rec.valuedProspectLeakageCount : i - rec.valuedProspect.count < rec.unvaluedProspectLeakageCount;
+      } else if (stage === "working") {
+        leaked = i < rec.workingLeakageCount;
+      } else if (stage === "signedReady") {
+        leaked = i < rec.signedReadyLeakageCount;
+      }
+
+      const value = Math.round((amt.value / Math.max(amt.count, 1)) * (0.7 + rng() * 0.6));
+      // Actual/latest-appraised value jittered off the estimated GTV — gives
+      // every listing (any stage) a real Variance without waiting for a sale.
+      const actualValue = Math.round(value * (0.85 + rng() * 0.3));
+
+      // Contact date: not meaningful once Sold (that table shows Auction End
+      // Date instead) — somewhere between ~3 weeks and ~14 months back.
+      const contactDateTimestamp =
+        stage === "closed" ? undefined : Date.now() - Math.round((21 + rng() * 400) * 24 * 60 * 60 * 1000);
+
+      // Signed date: only meaningful once a seller has actually signed —
+      // Signed Listings and Sold Actuals. Somewhere between ~1 and ~90 days back.
+      // Guaranteed non-undefined for those two stages — never blank.
+      const signedDateTimestamp =
+        stage === "signedReady" || stage === "closed" ? Date.now() - Math.round((1 + rng() * 89) * 24 * 60 * 60 * 1000) : undefined;
+
+      // Sold date: only meaningful once actually sold — Sold Actuals only.
+      // Always somewhere between signedDateTimestamp and now, so it's both
+      // guaranteed non-undefined and chronologically after the signed date.
+      const soldDateTimestamp =
+        stage === "closed" && signedDateTimestamp != null
+          ? signedDateTimestamp + Math.round(rng() * (Date.now() - signedDateTimestamp))
+          : undefined;
+
       listings.push({
         id: `${fips}-${stage}-${i}`,
         fips,
@@ -404,9 +689,21 @@ export function getCountyListings(fips: string, countyName: string, stateAbbr: s
         repId: rec.repId,
         stage,
         description: DESCRIPTORS[Math.floor(rng() * DESCRIPTORS.length)],
-        value: Math.round((amt.value / Math.max(amt.count, 1)) * (0.7 + rng() * 0.6)),
+        value,
         auctionId,
         auctionType,
+        valued,
+        leaked,
+        contactDateTimestamp,
+        contactDate: contactDateTimestamp ? formatAuctionDate(new Date(contactDateTimestamp)) : undefined,
+        signedDateTimestamp,
+        signedDate: signedDateTimestamp ? formatAuctionDate(new Date(signedDateTimestamp)) : undefined,
+        soldDateTimestamp,
+        soldDate: soldDateTimestamp ? formatAuctionDate(new Date(soldDateTimestamp)) : undefined,
+        commissionOption: COMMISSION_OPTIONS[Math.floor(rng() * COMMISSION_OPTIONS.length)],
+        vertical: VERTICALS[Math.floor(rng() * VERTICALS.length)],
+        sellerType: SELLER_TYPES[Math.floor(rng() * SELLER_TYPES.length)],
+        actualValue,
       });
     }
   });
@@ -415,7 +712,7 @@ export function getCountyListings(fips: string, countyName: string, stateAbbr: s
 
 export const STAGE_LABEL: Record<PipelineStage, string> = {
   prospect: "Prospect",
-  working: "Work In Progress",
+  working: "Unsigned",
   signedReady: "Signed & Ready",
   closed: "Closed",
 };
@@ -425,6 +722,31 @@ export const STAGE_COLOR: Record<PipelineStage, string> = {
   working: "#2563eb",
   signedReady: "#7c3aed",
   closed: "#16a34a",
+};
+
+export const PHASE_LABEL: Record<FunnelPhase, string> = {
+  unvaluedProspect: "Prospects",
+  valuedProspect: "Qualified Prospects",
+  working: "Unsigned Listings",
+  signedReady: "Signed Listings",
+  closed: "Actualized GTV",
+};
+
+export const PHASE_COLOR: Record<FunnelPhase, string> = {
+  unvaluedProspect: "#fdba74",
+  valuedProspect: "#f97316",
+  working: "#2563eb",
+  signedReady: "#7c3aed",
+  closed: "#16a34a",
+};
+
+/** Tooltip copy for each phase's Leakage metric — what it counts as not advancing to the next phase. */
+export const LEAKAGE_TOOLTIP: Record<FunnelPhase, string> = {
+  unvaluedProspect: "Prospects that did not advance to Valued Prospects. There's no leakage value here since these prospects haven't been valued yet.",
+  valuedProspect: "Valued prospects that did not convert to an Unsigned Listing.",
+  working: "Unsigned Listings that did not progress to Signed Listings.",
+  signedReady: "Signed Listings that did not progress to Sold Actuals.",
+  closed: "Sold Actuals is the final phase — there's nothing further for it to leak to.",
 };
 
 /* ---------------------------------- auctions -------------------------------- */
@@ -437,24 +759,35 @@ const AUCTION_NAMES = [
   "Southwest Irrigation Equipment", "Pacific Northwest Forestry",
 ];
 
-const AUCTION_TYPES: AuctionType[] = ["Single Seller", "Equipment", "At Risk"];
+export const AUCTION_TYPES: AuctionType[] = ["Equipment", "Livestock", "Realty", "Sullivan Classic Cars", "Sullivan Equipment", "Private"];
+// Weighted for generation — Equipment is BigIron's core business, Livestock
+// is common, Realty/Sullivan brands/Private sales are smaller niches.
+const AUCTION_TYPE_POOL: AuctionType[] = [
+  "Equipment", "Equipment", "Equipment", "Equipment",
+  "Livestock", "Livestock",
+  "Realty", "Sullivan Classic Cars", "Sullivan Equipment", "Private",
+];
+
+const EVENT_TYPES: EventType[] = ["Single Seller", "Multi-Seller"];
+const LINES_OF_BUSINESS: LineOfBusiness[] = ["Agriculture", "Collector Cars", "Const/Trans", "Livestock", "Real Estate"];
 
 function formatAuctionDate(d: Date): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 /**
- * Spans roughly a month back through 11 months forward, with a handful of
+ * Spans 3 months back through 11 months forward, with a handful of
  * real-dated auctions per month — enough density that filtering the
  * Auctions tab by This Week/Month/Quarter/Year actually shows different
- * subsets, rather than the same short list regardless of timeframe.
+ * subsets, rather than the same short list regardless of timeframe. The
+ * months in the past are all real, closed (already-sold) auctions.
  */
 function buildAuctions(): Auction[] {
   const now = new Date();
   const auctions: Auction[] = [];
   let counter = 0;
 
-  for (let offset = 1; offset >= -11; offset--) {
+  for (let offset = 3; offset >= -11; offset--) {
     const monthDate = new Date(now.getFullYear(), now.getMonth() - offset, 1);
     const monthLabel = `${monthDate.getFullYear()}-${monthDate.getMonth()}`;
     const monthRng = mulberry32(hashStr(monthLabel + "-auction-count"));
@@ -475,10 +808,16 @@ function buildAuctions(): Auction[] {
         id: `auction-${counter++}`,
         name,
         scheduled: true,
-        week: `Week of ${endDateLabel}`,
+        // Closed = the auction date has already passed — deterministic by
+        // real date, not a coin flip, so "closed" always lines up with what
+        // the calendar says.
+        closed: date.getTime() < now.getTime(),
+        week: endDateLabel,
         endDate: endDateLabel,
         endDateTimestamp: date.getTime(),
-        auctionType: AUCTION_TYPES[Math.floor(aRng() * AUCTION_TYPES.length)],
+        auctionType: AUCTION_TYPE_POOL[Math.floor(aRng() * AUCTION_TYPE_POOL.length)],
+        eventType: EVENT_TYPES[Math.floor(aRng() * EVENT_TYPES.length)],
+        lineOfBusiness: LINES_OF_BUSINESS[Math.floor(aRng() * LINES_OF_BUSINESS.length)],
         submittedCount,
         workingCount,
         acceptedCount,
@@ -491,6 +830,7 @@ function buildAuctions(): Auction[] {
 
   // Exactly one "Auction TBA" — no confirmed date, shown regardless of
   // whatever date-range filter is active since it doesn't have a real one.
+  // Never closed — it's just a placeholder until it's given a name and date.
   const tbaRng = mulberry32(hashStr("auction-tba"));
   const tbaExpected = new Date(now.getTime() + (14 + Math.floor(tbaRng() * 30)) * 24 * 60 * 60 * 1000);
   const tbaSubmittedCount = 8 + Math.floor(tbaRng() * 40);
@@ -502,10 +842,13 @@ function buildAuctions(): Auction[] {
     id: `auction-${counter++}`,
     name: "Auction TBA",
     scheduled: false,
-    week: `Week of ${tbaEndDateLabel} (expected)`,
+    closed: false,
+    week: `${tbaEndDateLabel} (expected)`,
     endDate: tbaEndDateLabel,
     endDateTimestamp: tbaExpected.getTime(),
-    auctionType: AUCTION_TYPES[Math.floor(tbaRng() * AUCTION_TYPES.length)],
+    auctionType: AUCTION_TYPE_POOL[Math.floor(tbaRng() * AUCTION_TYPE_POOL.length)],
+    eventType: EVENT_TYPES[Math.floor(tbaRng() * EVENT_TYPES.length)],
+    lineOfBusiness: LINES_OF_BUSINESS[Math.floor(tbaRng() * LINES_OF_BUSINESS.length)],
     submittedCount: tbaSubmittedCount,
     workingCount: tbaWorkingCount,
     acceptedCount: tbaAcceptedCount,
@@ -518,6 +861,12 @@ function buildAuctions(): Auction[] {
 }
 
 export const AUCTIONS: Auction[] = buildAuctions();
+
+// Unsigned Listings haven't been scheduled onto any real auction yet, so
+// every one of them is pinned to the single unscheduled "Auction TBA" —
+// consistent Auction/Auction End Date/Auction Type across the board until
+// a listing signs and moves to a real dated auction.
+const TBA_AUCTION = AUCTIONS.find((a) => !a.scheduled)!;
 
 export function auctionById(id: string | null | undefined): Auction | undefined {
   if (!id) return undefined;
@@ -573,10 +922,25 @@ export function getAuctionListings(auctionId: string): Listing[] {
   const auction = AUCTIONS.find((a) => a.id === auctionId);
   if (!auction) return [];
   const total = auction.submittedCount;
-  const stages: PipelineStage[] = ["prospect", "working", "signedReady", "closed"];
+  // Each auction is either already fully sold (Actualized GTV) or still in
+  // progress (Unsigned/Signed) — never both at once, so a sold auction never
+  // generates "working" (Unsigned) listings and vice versa. Tied to the
+  // auction's real closed flag (its date has passed), not a coin flip.
+  const stages: PipelineStage[] = auction.closed ? ["signedReady", "closed", "closed"] : ["prospect", "working", "signedReady"];
   return Array.from({ length: total }).map((_, i) => {
     const stage = stages[Math.floor(rng() * stages.length)];
     const rep = REPS[Math.floor(rng() * REPS.length)];
+    const value = Math.round((6 + rng() * 30) * 1000);
+    const contactDateTimestamp =
+      stage === "closed" ? undefined : Date.now() - Math.round((21 + rng() * 400) * 24 * 60 * 60 * 1000);
+    const signedDateTimestamp =
+      stage === "signedReady" || stage === "closed" ? Date.now() - Math.round((1 + rng() * 89) * 24 * 60 * 60 * 1000) : undefined;
+    const soldDateTimestamp =
+      stage === "closed" && signedDateTimestamp != null
+        ? signedDateTimestamp + Math.round(rng() * (Date.now() - signedDateTimestamp))
+        : undefined;
+    // Cancelled: a portion of Unsigned Listings never firmed up.
+    const leaked = stage === "working" ? rng() < 0.12 : undefined;
     return {
       id: `${auctionId}-listing-${i}`,
       fips: "",
@@ -585,9 +949,21 @@ export function getAuctionListings(auctionId: string): Listing[] {
       repId: rep.type === "territory" || rep.type === "independent" ? rep.id : null,
       stage,
       description: DESCRIPTORS[Math.floor(rng() * DESCRIPTORS.length)],
-      value: Math.round((6 + rng() * 30) * 1000),
+      value,
       auctionId,
       auctionType: auction.auctionType,
+      leaked,
+      contactDateTimestamp,
+      contactDate: contactDateTimestamp ? formatAuctionDate(new Date(contactDateTimestamp)) : undefined,
+      signedDateTimestamp,
+      signedDate: signedDateTimestamp ? formatAuctionDate(new Date(signedDateTimestamp)) : undefined,
+      soldDateTimestamp,
+      soldDate: soldDateTimestamp ? formatAuctionDate(new Date(soldDateTimestamp)) : undefined,
+      commissionOption: COMMISSION_OPTIONS[Math.floor(rng() * COMMISSION_OPTIONS.length)],
+      vertical: VERTICALS[Math.floor(rng() * VERTICALS.length)],
+      sellerType: SELLER_TYPES[Math.floor(rng() * SELLER_TYPES.length)],
+      // Only items that have actually sold ever get an Actual GTV.
+      actualValue: stage === "closed" ? Math.round(value * (0.85 + rng() * 0.3)) : undefined,
     };
   });
 }

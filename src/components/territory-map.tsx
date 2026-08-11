@@ -14,17 +14,17 @@ export const COUNTIES_URL =
   "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json";
 
 export const STATUS_COLOR: Record<string, string> = {
-  strong: "#16a34a",
-  growing: "#2563eb",
-  atrisk: "#f59e0b",
-  openProspect: "#dc2626",
+  healthy: "#16a34a",
+  unhealthy: "#f59e0b",
+  critical: "#dc2626",
+  openProspect: "#2563eb",
   unassigned: "#cbd5e1",
 };
 
 export const STATUS_LABEL: Record<string, string> = {
-  strong: "On/above pace",
-  growing: "In progress",
-  atrisk: "Needs attention",
+  healthy: "Healthy",
+  unhealthy: "Unhealthy",
+  critical: "Critical",
   openProspect: "Open prospect, no rep",
   unassigned: "No rep, no activity",
 };
@@ -33,9 +33,12 @@ export function countyStatus(rec: CountyRecord): keyof typeof STATUS_COLOR {
   if (!rec.repId) return rec.prospect.value > 0 ? "openProspect" : "unassigned";
   const strong = rec.closed.value + rec.signedReady.value;
   const risk = rec.prospect.value;
-  if (strong >= risk && strong >= rec.working.value) return "strong";
-  if (risk > strong) return "atrisk";
-  return "growing";
+  // Healthy: closed + signed pipeline outweighs both prospecting risk and WIP.
+  if (strong >= risk && strong >= rec.working.value) return "healthy";
+  // Otherwise, severity scales with how far prospecting risk outpaces the
+  // county's strong (closed + signed) pipeline.
+  if (risk > strong * 2) return "critical";
+  return "unhealthy";
 }
 
 export function fipsFromFeature(feature: Feature<Geometry, GeoJsonProperties>): string {
@@ -50,12 +53,17 @@ const INITIAL_ZOOM = 4;
 export interface TerritoryMapHandle {
   resetView: () => void;
   flyToState: (stateAbbr: string) => void;
+  flyToRep: (repId: string) => void;
 }
 
 interface TerritoryMapProps {
   geo: FeatureCollection | null;
   visibleRegions: RegionId[];
   stateFilter?: string | null;
+  /** When set (district scope), only counties whose assigned rep is in this set stay at full opacity — same dimming treatment as visibleRegions/stateFilter. */
+  visibleRepIds?: Set<string> | null;
+  /** Set when the map's own search picks a specific rep — dims every other county, same convention as stateFilter. Independent of visibleRepIds (the top role/team scope). */
+  repFilter?: string | null;
   selectedFips: string | null;
   selectedCountyMeta: { name: string; stateAbbr: string } | null;
   onSelectCounty: (fips: string, name: string, stateAbbr: string) => void;
@@ -96,7 +104,7 @@ function MapController({ mapRef }: { mapRef: React.MutableRefObject<L.Map | null
 }
 
 export const TerritoryMap = forwardRef<TerritoryMapHandle, TerritoryMapProps>(function TerritoryMap(
-  { geo, visibleRegions, stateFilter, selectedFips, selectedCountyMeta, onSelectCounty },
+  { geo, visibleRegions, stateFilter, visibleRepIds, repFilter, selectedFips, selectedCountyMeta, onSelectCounty },
   ref
 ) {
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -113,6 +121,25 @@ export const TerritoryMap = forwardRef<TerritoryMapHandle, TerritoryMapProps>(fu
         for (const feature of geo.features) {
           const fips = fipsFromFeature(feature as Feature<Geometry, GeoJsonProperties>);
           if (FIPS_TO_STATE[fips.slice(0, 2)] !== stateAbbr) continue;
+          try {
+            const b = L.geoJSON(feature as any).getBounds();
+            if (b.isValid()) bounds.extend(b);
+          } catch {
+            // Skip malformed geometry for this county.
+          }
+        }
+        if (bounds.isValid()) {
+          mapInstanceRef.current?.flyToBounds(bounds, { padding: [40, 40], duration: 0.6 });
+        }
+      },
+      flyToRep: (repId: string) => {
+        if (!geo) return;
+        const bounds = L.latLngBounds([]);
+        for (const feature of geo.features) {
+          const fips = fipsFromFeature(feature as Feature<Geometry, GeoJsonProperties>);
+          const name = `${(feature.properties as any)?.NAME ?? "Unknown"} County`;
+          const rec = getCountyRecord(fips, name);
+          if (rec.repId !== repId) continue;
           try {
             const b = L.geoJSON(feature as any).getBounds();
             if (b.isValid()) bounds.extend(b);
@@ -142,7 +169,11 @@ export const TerritoryMap = forwardRef<TerritoryMapHandle, TerritoryMapProps>(fu
     const fips = fipsFromFeature(feature);
     const name = `${(feature.properties as any)?.NAME ?? "Unknown"} County`;
     const rec = getCountyRecord(fips, name);
-    const inScope = visibleRegions.includes(rec.regionId) && (!stateFilter || rec.stateAbbr === stateFilter);
+    const inScope =
+      visibleRegions.includes(rec.regionId) &&
+      (!stateFilter || rec.stateAbbr === stateFilter) &&
+      (!visibleRepIds || (!!rec.repId && visibleRepIds.has(rec.repId))) &&
+      (!repFilter || rec.repId === repFilter);
     const selected = selectedFips === fips;
     const status = countyStatus(rec);
     return {
@@ -151,9 +182,7 @@ export const TerritoryMap = forwardRef<TerritoryMapHandle, TerritoryMapProps>(fu
       color: selected ? "#0f172a" : "#ffffff",
       weight: selected ? 1.5 : 0.4,
       // Dashed border is a second, non-color signal for "prospects exist but
-      // no rep is covering this county yet" — helps it read distinctly from
-      // "needs attention" (also a warm color) at a glance, including for
-      // colorblind users.
+      // no rep is covering this county yet" — a small assist for colorblind users.
       dashArray: status === "openProspect" ? "3,2" : undefined,
     };
   };
@@ -180,6 +209,7 @@ export const TerritoryMap = forwardRef<TerritoryMapHandle, TerritoryMapProps>(fu
         center={INITIAL_CENTER}
         zoom={INITIAL_ZOOM}
         scrollWheelZoom
+        zoomControl={false}
         className="h-full w-full rounded-lg"
         style={{ background: "#f8fafc" }}
       >
@@ -190,12 +220,32 @@ export const TerritoryMap = forwardRef<TerritoryMapHandle, TerritoryMapProps>(fu
             style() per feature — GeoJSON layers don't auto-restyle when a prop
             changes without this. Fine at county-level feature counts (~3.1k). */}
         <GeoJSON
-          key={`${selectedFips ?? "none"}-${visibleRegions.join(",")}-${stateFilter ?? "none"}`}
+          key={`${selectedFips ?? "none"}-${visibleRegions.join(",")}-${stateFilter ?? "none"}-${visibleRepIds ? Array.from(visibleRepIds).sort().join(",") : "none"}-${repFilter ?? "none"}`}
           data={geo}
           style={style}
           onEachFeature={onEachFeature}
         />
       </MapContainer>
+
+      <div className="absolute bottom-3 right-3 z-[1000] flex flex-col overflow-hidden rounded-md border bg-background/95 shadow-md backdrop-blur-sm">
+        <button
+          onClick={() => mapInstanceRef.current?.zoomIn()}
+          className="flex h-7 w-7 items-center justify-center text-sm font-medium text-foreground hover:bg-muted"
+          aria-label="Zoom in"
+          title="Zoom in"
+        >
+          +
+        </button>
+        <div className="h-px bg-border" />
+        <button
+          onClick={() => mapInstanceRef.current?.zoomOut()}
+          className="flex h-7 w-7 items-center justify-center text-sm font-medium text-foreground hover:bg-muted"
+          aria-label="Zoom out"
+          title="Zoom out"
+        >
+          −
+        </button>
+      </div>
 
       {selectedCountyMeta && (
         <div className="pointer-events-none absolute left-3 top-3 z-[1000] rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm">
