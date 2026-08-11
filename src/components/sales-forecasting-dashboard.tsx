@@ -835,6 +835,64 @@ export default function SalesForecastingDashboard() {
     return filtered;
   }, [countiesByRep, mapStateFilter]);
 
+  // Coverage counts for the county panel's placeholder (no county selected
+  // yet) — Regional Managers / DMs / Reps / Districts / Territories /
+  // Counties with reps, all scoped to whatever's currently filtered: the top
+  // role/team selector first, then the map's own state or rep search on top
+  // of that.
+  const territoriesScopeCounts = useMemo(() => {
+    if (mapRepFilter) {
+      const rep = repById(mapRepFilter);
+      const dm = rep?.parentId ? repById(rep.parentId) : undefined;
+      const rm = dm?.parentId ? repById(dm.parentId) : undefined;
+      const countyCount = countiesByRep.get(mapRepFilter)?.length ?? 0;
+      return {
+        regionalManagers: rm ? 1 : 0,
+        districtManagers: dm ? 1 : 0,
+        reps: rep ? 1 : 0,
+        districts: dm ? 1 : 0,
+        territories: rep ? 1 : 0,
+        countiesWithReps: countyCount,
+      };
+    }
+
+    if (mapStateFilter) {
+      // A state filter is inherently county-driven — base headcounts on
+      // whichever reps actually have a county in that state right now.
+      const repIdsInState = Array.from(countiesByRepMapScoped.keys());
+      const districtIds = new Set(repIdsInState.map((id) => repById(id)?.parentId).filter((id): id is string => !!id));
+      const regionIds = new Set(Array.from(districtIds).map((id) => repById(id)?.parentId).filter((id): id is string => !!id));
+      const countiesWithReps = Array.from(countiesByRepMapScoped.values()).reduce((s, list) => s + list.length, 0);
+      return {
+        regionalManagers: regionIds.size,
+        districtManagers: districtIds.size,
+        reps: repIdsInState.length,
+        districts: districtIds.size,
+        territories: repIdsInState.length,
+        countiesWithReps,
+      };
+    }
+
+    // Pure top-level scope (role/team + district/territory drill-down) —
+    // the real roster in scope, not just reps who happen to have a county.
+    const regionalManagers = REPS.filter((r) => r.type === "regional" && visibleRegions.includes(r.regionId)).length;
+    const districtReps = REPS.filter(
+      (r) => r.type === "district" && visibleRegions.includes(r.regionId) && (!effectiveDistrictId || r.id === effectiveDistrictId)
+    );
+    const fieldReps = REPS.filter(
+      (r) => (r.type === "territory" || r.type === "independent") && visibleRegions.includes(r.regionId) && (!visibleRepIds || visibleRepIds.has(r.id))
+    );
+    const countiesWithReps = Array.from(countiesByRepMapScoped.values()).reduce((s, list) => s + list.length, 0);
+    return {
+      regionalManagers,
+      districtManagers: districtReps.length,
+      reps: fieldReps.length,
+      districts: districtReps.length,
+      territories: fieldReps.length,
+      countiesWithReps,
+    };
+  }, [mapRepFilter, mapStateFilter, countiesByRepMapScoped, countiesByRep, visibleRegions, visibleRepIds, effectiveDistrictId]);
+
   const repRollupsMapScoped = useMemo(() => {
     if (!mapStateFilter) return repRollups;
     const rollups = new Map<string, RepRollup>();
@@ -2456,7 +2514,34 @@ export default function SalesForecastingDashboard() {
                       {TIMEFRAMES.find((t) => t.id === timeframe)!.label.toLowerCase()}
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="!py-2">
+                  <CardContent className="space-y-4 !py-2">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      <div className="rounded-lg border p-3">
+                        <p className="text-xs font-medium text-muted-foreground">Regional Managers</p>
+                        <p className="mt-1 text-lg font-semibold">{fmtNum(territoriesScopeCounts.regionalManagers)}</p>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <p className="text-xs font-medium text-muted-foreground">District Managers</p>
+                        <p className="mt-1 text-lg font-semibold">{fmtNum(territoriesScopeCounts.districtManagers)}</p>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <p className="text-xs font-medium text-muted-foreground">Reps</p>
+                        <p className="mt-1 text-lg font-semibold">{fmtNum(territoriesScopeCounts.reps)}</p>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <p className="text-xs font-medium text-muted-foreground">Districts</p>
+                        <p className="mt-1 text-lg font-semibold">{fmtNum(territoriesScopeCounts.districts)}</p>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <p className="text-xs font-medium text-muted-foreground">Territories</p>
+                        <p className="mt-1 text-lg font-semibold">{fmtNum(territoriesScopeCounts.territories)}</p>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <p className="text-xs font-medium text-muted-foreground">Counties with Reps</p>
+                        <p className="mt-1 text-lg font-semibold">{fmtNum(territoriesScopeCounts.countiesWithReps)}</p>
+                      </div>
+                    </div>
+
                     <PhaseCardGrid
                       amounts={{
                         unvaluedProspect: { count: totals.unvaluedProspectCount, value: 0 },
