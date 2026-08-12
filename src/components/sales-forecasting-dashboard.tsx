@@ -1561,6 +1561,8 @@ export default function SalesForecastingDashboard() {
               </SelectContent>
             </Select>
 
+            <div className="mx-1 h-5 w-px bg-slate-400" />
+
             <Select value={role} onValueChange={handleRoleChange}>
               <SelectTrigger className="h-8 w-[200px] bg-white text-xs">
                 <SelectValue />
