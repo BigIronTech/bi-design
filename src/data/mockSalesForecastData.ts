@@ -52,6 +52,8 @@ export interface CountyRecord {
   closed: StageAmount;
   /** Unvalued prospects that dropped out of the funnel before ever being valued — no dollar value, since they were never valued. */
   unvaluedProspectLeakageCount: number;
+  /** Unvalued prospects that haven't been reached out to yet at all — a subset of unvaluedProspect.count (a prospect can be both uncontacted and, separately, counted in leakage if it never gets contacted in time). */
+  unvaluedProspectUncontactedCount: number;
   /** Valued prospects that dropped out before converting to an Unsigned Listing. A count only — leakage $ value is derived from the actual tagged Listing records (see getCountyListings), never stored/randomized separately, so a zero count always implies a zero value. */
   valuedProspectLeakageCount: number;
   /** Unsigned Listings that dropped out before becoming Signed Listings. Count only, same reasoning as above. */
@@ -612,6 +614,9 @@ export function getCountyRecord(fips: string, rawName: string): CountyRecord {
     // summing those real records' values, so a zero leakage count always
     // means a zero leakage value.
     unvaluedProspectLeakageCount: unvaluedProspectCount > 0 && rng() < 0.012 ? 1 : 0,
+    // Uncontacted: a real chunk of New Prospects — unlike leakage, this isn't
+    // rare. Most brand-new leads simply haven't been reached out to yet.
+    unvaluedProspectUncontactedCount: Math.round(unvaluedProspectCount * (0.25 + rng() * 0.3)),
     valuedProspectLeakageCount: valuedProspectCount > 0 && rng() < 0.012 ? 1 : 0,
     workingLeakageCount: workingAmt.count > 0 && rng() < 0.009 ? 1 : 0,
     signedReadyLeakageCount: signedReadyAmt.count > 0 && rng() < 0.006 ? 1 : 0,
@@ -650,9 +655,11 @@ export function getCountyListings(fips: string, countyName: string, stateAbbr: s
       // of listings actually tagged `leaked` in that phase.
       let valued: boolean | undefined;
       let leaked: boolean | undefined;
+      let uncontacted = false;
       if (stage === "prospect") {
         valued = i < rec.valuedProspect.count;
         leaked = valued ? i < rec.valuedProspectLeakageCount : i - rec.valuedProspect.count < rec.unvaluedProspectLeakageCount;
+        uncontacted = !valued && i - rec.valuedProspect.count < rec.unvaluedProspectUncontactedCount;
       } else if (stage === "working") {
         leaked = i < rec.workingLeakageCount;
       } else if (stage === "signedReady") {
@@ -665,9 +672,10 @@ export function getCountyListings(fips: string, countyName: string, stateAbbr: s
       const actualValue = Math.round(value * (0.85 + rng() * 0.3));
 
       // Contact date: not meaningful once Sold (that table shows Auction End
-      // Date instead) — somewhere between ~3 weeks and ~14 months back.
+      // Date instead), and genuinely absent for prospects who haven't been
+      // reached out to yet — otherwise somewhere between ~3 weeks and ~14 months back.
       const contactDateTimestamp =
-        stage === "closed" ? undefined : Date.now() - Math.round((21 + rng() * 400) * 24 * 60 * 60 * 1000);
+        stage === "closed" || uncontacted ? undefined : Date.now() - Math.round((21 + rng() * 400) * 24 * 60 * 60 * 1000);
 
       // Signed date: only meaningful once a seller has actually signed —
       // Signed Listings and Sold Actuals. Somewhere between ~1 and ~90 days back.
@@ -727,8 +735,8 @@ export const STAGE_COLOR: Record<PipelineStage, string> = {
 };
 
 export const PHASE_LABEL: Record<FunnelPhase, string> = {
-  unvaluedProspect: "Prospects",
-  valuedProspect: "Qualified Prospects",
+  unvaluedProspect: "New Prospects",
+  valuedProspect: "Interested Prospects",
   working: "Unsigned Listings",
   signedReady: "Signed Listings",
   closed: "Actualized GTV",

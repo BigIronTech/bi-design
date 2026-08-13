@@ -93,10 +93,15 @@ interface RepRollup {
   repId: string;
   counties: number;
   unvaluedProspectCount: number;
+  unvaluedProspectUncontactedCount: number;
   valuedProspect: number;
+  valuedProspectCount: number;
   working: number;
+  workingCount: number;
   signedReady: number;
+  signedReadyCount: number;
   closed: number;
+  closedCount: number;
 }
 
 /** Display order for the 5-phase funnel in rep-scoped views (Reps & Territories table, expanded rep cards, county info panel) — matches the Overview funnel order. */
@@ -106,10 +111,15 @@ const emptyRepRollup = (repId: string): RepRollup => ({
   repId,
   counties: 0,
   unvaluedProspectCount: 0,
+  unvaluedProspectUncontactedCount: 0,
   valuedProspect: 0,
+  valuedProspectCount: 0,
   working: 0,
+  workingCount: 0,
   signedReady: 0,
+  signedReadyCount: 0,
   closed: 0,
+  closedCount: 0,
 });
 
 /* -------------------------- generic table sorting -------------------------- */
@@ -266,21 +276,29 @@ type PhaseAmounts = Record<FunnelPhase, { count: number; value: number }>;
 /** Read-only 6-card grid: the 5 funnel phases in canonical order, plus a
  * trailing Potential GTV card (sum of the four valued phases). Used for the
  * Territories county info panel, both when a county is selected and — with
- * scope-level totals instead — when it isn't. */
-function PhaseCardGrid({ amounts, factor }: { amounts: PhaseAmounts; factor: number }) {
+ * scope-level totals instead — when it isn't. Follows the same count-as-primary
+ * convention as the Overview tab's cards: count leads for every phase except
+ * Actualized/Potential GTV (where the dollar value leads and listing count
+ * is the secondary line). */
+function PhaseCardGrid({ amounts, factor, uncontactedCount }: { amounts: PhaseAmounts; factor: number; uncontactedCount: number }) {
   const totalPotential = (amounts.valuedProspect.value + amounts.working.value + amounts.signedReady.value + amounts.closed.value) * factor;
+  const totalPotentialCount = amounts.valuedProspect.count + amounts.working.count + amounts.signedReady.count + amounts.closed.count;
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
       {REP_PHASE_ORDER.map((phase) => {
         const amt = amounts[phase];
+        const isValuePrimary = phase === "closed";
+        const primaryText = isValuePrimary ? fmtMoney(amt.value * factor) : fmtNum(amt.count);
+        const secondaryText =
+          phase === "unvaluedProspect" ? `${fmtNum(uncontactedCount)} uncontacted` : isValuePrimary ? `${fmtNum(amt.count)} listings` : fmtMoney(amt.value * factor);
         return (
           <div key={phase} className="rounded-lg border p-3">
             <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <span className="h-2 w-2 rounded-full" style={{ background: PHASE_COLOR[phase] }} />
               {PHASE_LABEL[phase]}
             </div>
-            <p className="mt-1 text-lg font-semibold">{phase === "unvaluedProspect" ? fmtNum(amt.count) : fmtMoney(amt.value * factor)}</p>
-            <p className="text-xs text-muted-foreground">{phase === "unvaluedProspect" ? "prospects" : `${amt.count} listings`}</p>
+            <p className="mt-1 text-lg font-semibold">{primaryText}</p>
+            <p className="text-xs text-muted-foreground">{secondaryText}</p>
           </div>
         );
       })}
@@ -290,7 +308,7 @@ function PhaseCardGrid({ amounts, factor }: { amounts: PhaseAmounts; factor: num
           Potential GTV
         </div>
         <p className="mt-1 text-lg font-semibold">{fmtMoney(totalPotential)}</p>
-        <p className="text-xs text-muted-foreground">Sum of four valued phases</p>
+        <p className="text-xs text-muted-foreground">{fmtNum(totalPotentialCount)} listings</p>
       </div>
     </div>
   );
@@ -762,7 +780,7 @@ export default function SalesForecastingDashboard() {
   const { totals, repRollups, countiesByRep, totalsByState } = useMemo(() => {
     const totals = {
       prospect: 0, prospectAssigned: 0, working: 0, signedReady: 0, closed: 0, priorYearClosed: 0, budget: 0,
-      unvaluedProspectCount: 0,
+      unvaluedProspectCount: 0, unvaluedProspectUncontactedCount: 0,
       valuedProspectCount: 0, valuedProspectValue: 0,
       workingCount: 0, signedReadyCount: 0, closedCount: 0,
     };
@@ -787,6 +805,7 @@ export default function SalesForecastingDashboard() {
         totals.priorYearClosed += rec.priorYearClosed;
         totals.budget += rec.budget;
         totals.unvaluedProspectCount += rec.unvaluedProspect.count;
+        totals.unvaluedProspectUncontactedCount += rec.unvaluedProspectUncontactedCount;
         totals.valuedProspectCount += rec.valuedProspect.count;
         totals.valuedProspectValue += rec.valuedProspect.value;
         totals.workingCount += rec.working.count;
@@ -807,10 +826,15 @@ export default function SalesForecastingDashboard() {
           const r = rollups.get(rec.repId) ?? emptyRepRollup(rec.repId);
           r.counties += 1;
           r.unvaluedProspectCount += rec.unvaluedProspect.count;
+          r.unvaluedProspectUncontactedCount += rec.unvaluedProspectUncontactedCount;
           r.valuedProspect += rec.valuedProspect.value;
+          r.valuedProspectCount += rec.valuedProspect.count;
           r.working += rec.working.value;
+          r.workingCount += rec.working.count;
           r.signedReady += rec.signedReady.value;
+          r.signedReadyCount += rec.signedReady.count;
           r.closed += rec.closed.value;
+          r.closedCount += rec.closed.count;
           rollups.set(rec.repId, r);
 
           const list = byRep.get(rec.repId) ?? [];
@@ -902,10 +926,15 @@ export default function SalesForecastingDashboard() {
           repId,
           counties: acc.counties + 1,
           unvaluedProspectCount: acc.unvaluedProspectCount + c.unvaluedProspect.count,
+          unvaluedProspectUncontactedCount: acc.unvaluedProspectUncontactedCount + c.unvaluedProspectUncontactedCount,
           valuedProspect: acc.valuedProspect + c.valuedProspect.value,
+          valuedProspectCount: acc.valuedProspectCount + c.valuedProspect.count,
           working: acc.working + c.working.value,
+          workingCount: acc.workingCount + c.working.count,
           signedReady: acc.signedReady + c.signedReady.value,
+          signedReadyCount: acc.signedReadyCount + c.signedReady.count,
           closed: acc.closed + c.closed.value,
+          closedCount: acc.closedCount + c.closed.count,
         }),
         emptyRepRollup(repId)
       );
@@ -1127,6 +1156,7 @@ export default function SalesForecastingDashboard() {
     // Unvalued Prospects — count only, no dollar value (not yet valued).
     unvaluedProspectCount: unvaluedProspectListings.length,
     unvaluedProspectLeakageCount: leakedOnly(unvaluedProspectListings).length,
+    unvaluedProspectUncontactedCount: unvaluedProspectListings.filter((l) => !l.contactDate).length,
     // Valued Prospects
     valuedProspectCount: valuedProspectListings.length,
     valuedProspectValue: sumValue(valuedProspectListings),
@@ -1149,6 +1179,7 @@ export default function SalesForecastingDashboard() {
     budget: Math.round(overviewTotals.budget * factor),
   };
   const totalPotential = scaled.closedValue + scaled.signedReadyValue + scaled.workingValue + scaled.valuedProspectValue;
+  const totalPotentialCount = scaled.closedCount + scaled.signedReadyCount + scaled.workingCount + scaled.valuedProspectCount;
   const varPct = scaled.priorYearClosed > 0 ? ((scaled.closedValue - scaled.priorYearClosed) / scaled.priorYearClosed) * 100 : 0;
 
   // Per the Overview redesign, only Sold Actuals keeps a progress meter
@@ -1457,7 +1488,7 @@ export default function SalesForecastingDashboard() {
       "District Manager": manager?.name ?? "",
       Counties: roll.counties,
       "Prospects (Count)": roll.unvaluedProspectCount,
-      "Qualified Prospects": Math.round(roll.valuedProspect * factor),
+      "Interested Prospects": Math.round(roll.valuedProspect * factor),
       "Unsigned Listings": Math.round(roll.working * factor),
       "Signed Listings": Math.round(roll.signedReady * factor),
       "Actualized GTV": Math.round(roll.closed * factor),
@@ -1825,6 +1856,7 @@ export default function SalesForecastingDashboard() {
                 active={selectedStage === "unvaluedProspect"}
                 primary={{ label: "Total Prospect Count", value: fmtNum(scaled.unvaluedProspectCount) }}
                 metrics={[
+                  { label: "Uncontacted Prospects", value: fmtNum(scaled.unvaluedProspectUncontactedCount) },
                   { label: "Leakage Count", value: fmtNum(scaled.unvaluedProspectLeakageCount), tooltip: LEAKAGE_TOOLTIP.unvaluedProspect },
                 ]}
               />
@@ -1833,9 +1865,9 @@ export default function SalesForecastingDashboard() {
                 icon={<BadgeDollarSign className="h-4 w-4" />}
                 onClick={() => setSelectedStage(selectedStage === "valuedProspect" ? null : "valuedProspect")}
                 active={selectedStage === "valuedProspect"}
-                primary={{ label: "Estimated Prospect Value", value: fmtMoney(scaled.valuedProspectValue) }}
+                primary={{ label: "Total Prospect Count", value: fmtNum(scaled.valuedProspectCount) }}
                 metrics={[
-                  { label: "Total Prospect Count", value: fmtNum(scaled.valuedProspectCount) },
+                  { label: "Value", value: fmtMoney(scaled.valuedProspectValue) },
                   { label: "Leakage Count", value: fmtNum(scaled.valuedProspectLeakageCount), tooltip: LEAKAGE_TOOLTIP.valuedProspect },
                   { label: "Leakage Value", value: fmtMoney(scaled.valuedProspectLeakageValue), tooltip: LEAKAGE_TOOLTIP.valuedProspect },
                 ]}
@@ -1845,9 +1877,9 @@ export default function SalesForecastingDashboard() {
                 icon={<Handshake className="h-4 w-4" />}
                 onClick={() => setSelectedStage(selectedStage === "working" ? null : "working")}
                 active={selectedStage === "working"}
-                primary={{ label: "Estimated Value", value: fmtMoney(scaled.workingValue) }}
+                primary={{ label: "Total Listing Count", value: fmtNum(scaled.workingCount) }}
                 metrics={[
-                  { label: "Total Listing Count", value: fmtNum(scaled.workingCount) },
+                  { label: "Value", value: fmtMoney(scaled.workingValue) },
                   { label: "Leakage Count", value: fmtNum(scaled.workingLeakageCount), tooltip: LEAKAGE_TOOLTIP.working },
                   { label: "Leakage Value", value: fmtMoney(scaled.workingLeakageValue), tooltip: LEAKAGE_TOOLTIP.working },
                 ]}
@@ -1857,9 +1889,9 @@ export default function SalesForecastingDashboard() {
                 icon={<CheckCircle2 className="h-4 w-4" />}
                 onClick={() => setSelectedStage(selectedStage === "signedReady" ? null : "signedReady")}
                 active={selectedStage === "signedReady"}
-                primary={{ label: "Estimated Value", value: fmtMoney(scaled.signedReadyValue) }}
+                primary={{ label: "Total Listing Count", value: fmtNum(scaled.signedReadyCount) }}
                 metrics={[
-                  { label: "Total Listing Count", value: fmtNum(scaled.signedReadyCount) },
+                  { label: "Value", value: fmtMoney(scaled.signedReadyValue) },
                   { label: "Leakage Count", value: fmtNum(scaled.signedReadyLeakageCount), tooltip: LEAKAGE_TOOLTIP.signedReady },
                   { label: "Leakage Value", value: fmtMoney(scaled.signedReadyLeakageValue), tooltip: LEAKAGE_TOOLTIP.signedReady },
                 ]}
@@ -1887,6 +1919,7 @@ export default function SalesForecastingDashboard() {
                 icon={<Gavel className="h-4 w-4" />}
                 accentColor="#ffc901"
                 primary={{ label: "Sum of four valued phases", value: fmtMoney(totalPotential) }}
+                metrics={[{ label: "Total Listing Count", value: fmtNum(totalPotentialCount) }]}
               />
             </div>
           </TooltipProvider>
@@ -2133,14 +2166,17 @@ export default function SalesForecastingDashboard() {
                       </div>
 
                       <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[11px]">
-                        <span className={`inline-flex items-center gap-0.5 ${vsPriorPct >= 0 ? "text-green-600" : "text-red-600"}`}>
-                          {vsPriorPct >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                          {fmtPct(vsPriorPct)} vs {fmtMoney(priorYear)} last year
+                        <span className="inline-flex items-center gap-0.5">
+                          {vsPriorPct >= 0 ? <TrendingUp className="h-3 w-3 text-green-600" /> : <TrendingDown className="h-3 w-3 text-red-600" />}
+                          <span className={vsPriorPct >= 0 ? "text-green-600" : "text-red-600"}>{fmtPct(vsPriorPct)}</span>
+                          <span className="text-muted-foreground">vs {fmtMoney(priorYear)} last year</span>
                         </span>
                         {hasGoal &&
                           (pctOfGoal != null ? (
-                            <span className={overGoal ? "font-medium text-green-600" : "font-medium text-amber-600"}>
-                              {pctOfGoal.toFixed(0)}% of {fmtMoney(row.Goal)} goal
+                            <span>
+                              <span className="text-muted-foreground">{pctOfGoal.toFixed(0)}% of </span>
+                              <span className={overGoal ? "font-medium text-green-600" : "font-medium text-amber-600"}>{fmtMoney(row.Goal)}</span>
+                              <span className="text-muted-foreground"> goal</span>
                             </span>
                           ) : (
                             <span className="text-muted-foreground">No goal set</span>
@@ -2471,6 +2507,7 @@ export default function SalesForecastingDashboard() {
                         closed: selectedCountyRecord.closed,
                       }}
                       factor={factor}
+                      uncontactedCount={selectedCountyRecord.unvaluedProspectUncontactedCount}
                     />
 
                     <div className="max-h-96 overflow-y-auto rounded-md border [&>div]:overflow-visible">
@@ -2583,6 +2620,7 @@ export default function SalesForecastingDashboard() {
                         closed: { count: totals.closedCount, value: totals.closed },
                       }}
                       factor={factor}
+                      uncontactedCount={totals.unvaluedProspectUncontactedCount}
                     />
                   </CardContent>
                 </>
@@ -2682,8 +2720,24 @@ export default function SalesForecastingDashboard() {
                                     <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-6">
                                       {REP_PHASE_ORDER.map((phase) => {
                                         const isActive = repStageFilter === phase;
-                                        const value =
-                                          phase === "unvaluedProspect" ? fmtNum(roll.unvaluedProspectCount) : fmtMoney(roll[phase] * factor);
+                                        let primaryText: string;
+                                        let secondaryText: string;
+                                        if (phase === "unvaluedProspect") {
+                                          primaryText = fmtNum(roll.unvaluedProspectCount);
+                                          secondaryText = `${fmtNum(roll.unvaluedProspectUncontactedCount)} uncontacted`;
+                                        } else if (phase === "valuedProspect") {
+                                          primaryText = fmtNum(roll.valuedProspectCount);
+                                          secondaryText = fmtMoney(roll.valuedProspect * factor);
+                                        } else if (phase === "working") {
+                                          primaryText = fmtNum(roll.workingCount);
+                                          secondaryText = fmtMoney(roll.working * factor);
+                                        } else if (phase === "signedReady") {
+                                          primaryText = fmtNum(roll.signedReadyCount);
+                                          secondaryText = fmtMoney(roll.signedReady * factor);
+                                        } else {
+                                          primaryText = fmtMoney(roll.closed * factor);
+                                          secondaryText = `${fmtNum(roll.closedCount)} listings`;
+                                        }
                                         return (
                                           <button
                                             key={phase}
@@ -2697,7 +2751,8 @@ export default function SalesForecastingDashboard() {
                                               <span className="h-2 w-2 rounded-full" style={{ background: PHASE_COLOR[phase] }} />
                                               {PHASE_LABEL[phase]}
                                             </div>
-                                            <p className="mt-1 text-sm font-semibold">{value}</p>
+                                            <p className="mt-1 text-sm font-semibold">{primaryText}</p>
+                                            <p className="text-[10px] text-muted-foreground">{secondaryText}</p>
                                           </button>
                                         );
                                       })}
@@ -2708,6 +2763,9 @@ export default function SalesForecastingDashboard() {
                                         </div>
                                         <p className="mt-1 text-sm font-semibold">
                                           {fmtMoney((roll.valuedProspect + roll.working + roll.signedReady + roll.closed) * factor)}
+                                        </p>
+                                        <p className="text-[10px] text-muted-foreground">
+                                          {fmtNum(roll.valuedProspectCount + roll.workingCount + roll.signedReadyCount + roll.closedCount)} listings
                                         </p>
                                       </div>
                                     </div>
@@ -2894,7 +2952,7 @@ export default function SalesForecastingDashboard() {
                             {a.cancelledCount > 0 ? `${a.cancelledCount} · ${fmtMoney(a.cancelledValue)}` : "—"}
                           </TableCell>
                           <TableCell className="text-right">
-                            {a.signedCount} · {fmtMoney(a.signedValue)}
+                            {a.signedCount > 0 ? `${a.signedCount} · ${fmtMoney(a.signedValue)}` : "—"}
                           </TableCell>
                           <TableCell className="text-right">
                             {a.soldCount > 0 ? `${a.soldCount} · ${fmtMoney(a.soldActualValue)}` : "—"}
