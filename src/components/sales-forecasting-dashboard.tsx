@@ -1867,7 +1867,7 @@ export default function SalesForecastingDashboard() {
                 active={selectedStage === "valuedProspect"}
                 primary={{ label: "Total Prospect Count", value: fmtNum(scaled.valuedProspectCount) }}
                 metrics={[
-                  { label: "Value", value: fmtMoney(scaled.valuedProspectValue) },
+                  { label: "Estimated Value", value: fmtMoney(scaled.valuedProspectValue) },
                   { label: "Leakage Count", value: fmtNum(scaled.valuedProspectLeakageCount), tooltip: LEAKAGE_TOOLTIP.valuedProspect },
                   { label: "Leakage Value", value: fmtMoney(scaled.valuedProspectLeakageValue), tooltip: LEAKAGE_TOOLTIP.valuedProspect },
                 ]}
@@ -1879,7 +1879,7 @@ export default function SalesForecastingDashboard() {
                 active={selectedStage === "working"}
                 primary={{ label: "Total Listing Count", value: fmtNum(scaled.workingCount) }}
                 metrics={[
-                  { label: "Value", value: fmtMoney(scaled.workingValue) },
+                  { label: "Estimated Value", value: fmtMoney(scaled.workingValue) },
                   { label: "Leakage Count", value: fmtNum(scaled.workingLeakageCount), tooltip: LEAKAGE_TOOLTIP.working },
                   { label: "Leakage Value", value: fmtMoney(scaled.workingLeakageValue), tooltip: LEAKAGE_TOOLTIP.working },
                 ]}
@@ -1891,7 +1891,7 @@ export default function SalesForecastingDashboard() {
                 active={selectedStage === "signedReady"}
                 primary={{ label: "Total Listing Count", value: fmtNum(scaled.signedReadyCount) }}
                 metrics={[
-                  { label: "Value", value: fmtMoney(scaled.signedReadyValue) },
+                  { label: "Estimated Value", value: fmtMoney(scaled.signedReadyValue) },
                   { label: "Leakage Count", value: fmtNum(scaled.signedReadyLeakageCount), tooltip: LEAKAGE_TOOLTIP.signedReady },
                   { label: "Leakage Value", value: fmtMoney(scaled.signedReadyLeakageValue), tooltip: LEAKAGE_TOOLTIP.signedReady },
                 ]}
