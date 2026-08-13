@@ -27,8 +27,7 @@ import {
   User,
   X,
 } from 'lucide-react'
-import { loadDb, saveDb, seedDbIfEmpty } from './category-db'
-import type { DbState } from './category-db'
+import { loadDb, saveDb, seedDbIfEmpty } from '@/data/category-db'
 import { cn } from '@/lib/utils'
 import { AppSidebar } from '@/components/app-sidebar'
 import {

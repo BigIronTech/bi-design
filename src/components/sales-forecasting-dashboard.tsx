@@ -1162,12 +1162,18 @@ export default function SalesForecastingDashboard() {
   // Deterministic per-timeframe variation so the trend chart shows realistic
   // week-to-week/quarter-to-quarter movement instead of the same ratio
   // scaled by a constant factor (which always looked identical across bars).
-  const trendJitter = (key: string) => 0.82 + mulberry32(hashStr(key))() * 0.36;
+  const trendJitter = (key: string, min = 0.82, max = 1.18) => min + mulberry32(hashStr(key))() * (max - min);
   const trendData = TIMEFRAMES.map((tf) => ({
     id: tf.id,
     name: tf.label.replace("This ", ""),
     Actual: sumListingsInRange("closed", getTimeframeDateRange(tf.id)),
-    "Prior Year": Math.round(overviewTotals.priorYearClosed * tf.factor * trendJitter(`${tf.id}-prior`)),
+    // This Week's prior-year comparison is intentionally trended lower (vs.
+    // the normal 0.82-1.18 jitter) so the "current year ahead of last year"
+    // state is easy to see without waiting for a week where it happens
+    // naturally — every other timeframe keeps the normal, evenly-mixed jitter.
+    "Prior Year": Math.round(
+      overviewTotals.priorYearClosed * tf.factor * (tf.id === "week" ? trendJitter(`${tf.id}-prior`, 0.45, 0.65) : trendJitter(`${tf.id}-prior`))
+    ),
     Goal: Math.round(overviewTotals.budget * tf.factor),
   }));
 
@@ -1346,6 +1352,13 @@ export default function SalesForecastingDashboard() {
         const soldEstimatedValue = soldListings.reduce((s, l) => s + l.value, 0);
         const soldActualValue = soldListings.reduce((s, l) => s + (l.actualValue ?? 0), 0);
         const soldVarianceValue = soldActualValue - soldEstimatedValue;
+        // Total Potential's makeup depends on where the auction actually is
+        // in its lifecycle:
+        //  - Closed (fully reconciled): just what it actualized.
+        //  - Live (a real mix of sold/pending): Signed + Actualized — an
+        //    unsigned listing this late isn't realistically converting in time.
+        //  - Upcoming (incl. Auction TBA): Unsigned + Signed — nothing's sold yet.
+        const totalPotentialValue = a.closed ? soldActualValue : a.live ? signedValue + soldActualValue : unsignedValue + signedValue;
         return {
           ...a,
           // Everything tied to this auction that's actually in a phase we
@@ -1362,7 +1375,7 @@ export default function SalesForecastingDashboard() {
           soldEstimatedValue,
           soldActualValue,
           soldVarianceValue,
-          totalPotentialValue: unsignedValue + signedValue + soldActualValue,
+          totalPotentialValue,
         };
       }),
     [visibleRegions, visibleRepIds, auctionTypeFilter]
@@ -1385,10 +1398,18 @@ export default function SalesForecastingDashboard() {
   // Estimated GTV = still-in-motion value across confirmed auctions (Unsigned + Signed, not yet sold).
   // Actualized GTV = already-sold value across confirmed auctions (real sale prices, not estimates).
   // Potential GTV = everything that could happen — confirmed auctions' full Total Potential, plus Auction TBA's.
+  const estimatedUnsigned = scheduledAuctions.reduce((s, a) => s + a.unsignedValue, 0);
+  const estimatedSigned = scheduledAuctions.reduce((s, a) => s + a.signedValue, 0);
+  const potentialConfirmed = scheduledAuctions.reduce((s, a) => s + a.totalPotentialValue, 0);
+  const potentialTBA = tbaAuction?.totalPotentialValue ?? 0;
   const auctionTotals = {
-    estimated: scheduledAuctions.reduce((s, a) => s + a.unsignedValue + a.signedValue, 0),
+    estimated: estimatedUnsigned + estimatedSigned,
     actualized: scheduledAuctions.reduce((s, a) => s + a.soldActualValue, 0),
-    potential: scheduledAuctions.reduce((s, a) => s + a.totalPotentialValue, 0) + (tbaAuction?.totalPotentialValue ?? 0),
+    potential: potentialConfirmed + potentialTBA,
+    estimatedUnsigned,
+    estimatedSigned,
+    potentialConfirmed,
+    potentialTBA,
   };
   const auctionRemaining = Math.max(auctionTotals.potential - auctionTotals.actualized, 0);
 
@@ -1402,7 +1423,6 @@ export default function SalesForecastingDashboard() {
     cancelled: (a: (typeof scopedAuctions)[number]) => a.cancelledValue,
     signed: (a: (typeof scopedAuctions)[number]) => a.signedValue,
     sold: (a: (typeof scopedAuctions)[number]) => a.soldActualValue,
-    variance: (a: (typeof scopedAuctions)[number]) => a.soldVarianceValue,
     totalPotential: (a: (typeof scopedAuctions)[number]) => a.totalPotentialValue,
   };
   const sortedAuctions = useMemo(() => sortRows(timeframeFilteredAuctions, auctionsSort.sort, auctionsAccessors), [timeframeFilteredAuctions, auctionsSort.sort]);
@@ -2070,15 +2090,15 @@ export default function SalesForecastingDashboard() {
               <div className="flex items-center gap-3 pt-0.5">
                 <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   <span className="h-2.5 w-2.5 rounded-sm bg-slate-900" />
-                  This Year
+                  Actual
                 </div>
                 <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <span className="h-2.5 w-2.5 rounded-sm bg-slate-300" />
-                  Last Year
+                  <span className="h-2.5 w-1 rounded-sm bg-slate-500" />
+                  Prior Year
                 </div>
                 <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <span className="h-2.5 w-2.5 rounded-sm border-2 border-dashed border-amber-500 bg-transparent" />
-                  Goal (Quarter/Year)
+                  <span className="h-2.5 w-1 rounded-sm bg-amber-500" />
+                  Current Year Goals (Quarter/Year)
                 </div>
               </div>
             </CardHeader>
@@ -2086,35 +2106,45 @@ export default function SalesForecastingDashboard() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {trendData.map((row) => {
                   const priorYear = row["Prior Year"];
-                  const showGoal = row.id === "quarter" || row.id === "year";
-                  const max = Math.max(row.Actual, priorYear, showGoal ? row.Goal : 0, 1);
+                  const hasGoal = row.id === "quarter" || row.id === "year";
+                  const max = Math.max(row.Actual, priorYear, hasGoal ? row.Goal : 0, 1) * 1.08;
+                  const actualPct = Math.min((row.Actual / max) * 100, 100);
+                  const priorPct = Math.min((priorYear / max) * 100, 100);
+                  const goalPct = hasGoal ? Math.min((row.Goal / max) * 100, 100) : null;
+                  const pctOfGoal = hasGoal && row.Goal > 0 ? (row.Actual / row.Goal) * 100 : null;
+                  const overGoal = pctOfGoal != null && pctOfGoal >= 100;
+                  const vsPriorPct = priorYear > 0 ? ((row.Actual - priorYear) / priorYear) * 100 : 0;
                   return (
                     <div key={row.name} className="rounded-lg border-2 p-3">
-                      <p className="mb-2 text-xs font-medium text-muted-foreground">{row.name}</p>
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
-                            <div className="h-full rounded-full bg-slate-900" style={{ width: `${(row.Actual / max) * 100}%` }} />
-                          </div>
-                          <span className="w-16 shrink-0 text-right text-xs font-semibold">{fmtMoney(row.Actual)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
-                            <div className="h-full rounded-full bg-slate-300" style={{ width: `${(priorYear / max) * 100}%` }} />
-                          </div>
-                          <span className="w-16 shrink-0 text-right text-xs text-muted-foreground">{fmtMoney(priorYear)}</span>
-                        </div>
-                        {showGoal && (
-                          <div className="flex items-center gap-2">
-                            <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
-                              <div
-                                className="h-full rounded-full border-2 border-dashed border-amber-500 bg-transparent"
-                                style={{ width: `${(row.Goal / max) * 100}%` }}
-                              />
-                            </div>
-                            <span className="w-16 shrink-0 text-right text-xs text-amber-600">{fmtMoney(row.Goal)}</span>
-                          </div>
+                      <div className="mb-2 flex items-baseline justify-between">
+                        <p className="text-xs font-medium text-muted-foreground">{row.name}</p>
+                        <p className="text-lg font-semibold">{fmtMoney(row.Actual)}</p>
+                      </div>
+
+                      <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full rounded-full ${hasGoal ? (overGoal ? "bg-green-600" : "bg-slate-900") : "bg-slate-900"}`}
+                          style={{ width: `${actualPct}%` }}
+                        />
+                        <div className="absolute top-0 h-full w-[3px] bg-slate-500" style={{ left: `calc(${priorPct}% - 1.5px)` }} title="Prior Year" />
+                        {goalPct != null && (
+                          <div className="absolute top-0 h-full w-[3px] bg-amber-500" style={{ left: `calc(${goalPct}% - 1.5px)` }} title="Goal" />
                         )}
+                      </div>
+
+                      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[11px]">
+                        <span className={`inline-flex items-center gap-0.5 ${vsPriorPct >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {vsPriorPct >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                          {fmtPct(vsPriorPct)} vs {fmtMoney(priorYear)} last year
+                        </span>
+                        {hasGoal &&
+                          (pctOfGoal != null ? (
+                            <span className={overGoal ? "font-medium text-green-600" : "font-medium text-amber-600"}>
+                              {pctOfGoal.toFixed(0)}% of {fmtMoney(row.Goal)} goal
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">No goal set</span>
+                          ))}
                       </div>
                     </div>
                   );
@@ -2773,8 +2803,28 @@ export default function SalesForecastingDashboard() {
         {/* ------------------------------- AUCTIONS ------------------------------- */}
         <TabsContent value="auctions" className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Estimated GTV" value={fmtMoney(auctionTotals.estimated)} icon={<Target className="h-4 w-4" />} footer={<span className="text-muted-foreground">Unsigned + Signed, confirmed auctions</span>} />
-            <StatCard label="Potential GTV" value={fmtMoney(auctionTotals.potential)} icon={<Gavel className="h-4 w-4" />} footer={<span className="text-muted-foreground">Confirmed auctions + Auction TBA</span>} />
+            <StatCard
+              label="Estimated GTV"
+              value={fmtMoney(auctionTotals.estimated)}
+              icon={<Target className="h-4 w-4" />}
+              footer={
+                <span className="text-muted-foreground">
+                  <span className="font-medium text-foreground">{fmtMoney(auctionTotals.estimatedUnsigned)}</span> Unsigned +{" "}
+                  <span className="font-medium text-foreground">{fmtMoney(auctionTotals.estimatedSigned)}</span> Signed
+                </span>
+              }
+            />
+            <StatCard
+              label="Potential GTV"
+              value={fmtMoney(auctionTotals.potential)}
+              icon={<Gavel className="h-4 w-4" />}
+              footer={
+                <span className="text-muted-foreground">
+                  <span className="font-medium text-foreground">{fmtMoney(auctionTotals.potentialConfirmed)}</span> Confirmed +{" "}
+                  <span className="font-medium text-foreground">{fmtMoney(auctionTotals.potentialTBA)}</span> Auction TBA
+                </span>
+              }
+            />
             <StatCard label="Actualized GTV" value={fmtMoney(auctionTotals.actualized)} icon={<CheckCircle2 className="h-4 w-4" />} footer={<span className="text-muted-foreground">Already-sold, confirmed auctions</span>} />
             <StatCard
               label="Remaining vs Actualized"
@@ -2806,7 +2856,6 @@ export default function SalesForecastingDashboard() {
                     <SortableHead label="Cancelled Listings" sortKey="cancelled" sort={auctionsSort.sort} onSort={auctionsSort.onSort} align="right" />
                     <SortableHead label="Signed Listings" sortKey="signed" sort={auctionsSort.sort} onSort={auctionsSort.onSort} align="right" />
                     <SortableHead label="Actualized GTV" sortKey="sold" sort={auctionsSort.sort} onSort={auctionsSort.onSort} align="right" />
-                    <SortableHead label="Variance" sortKey="variance" sort={auctionsSort.sort} onSort={auctionsSort.onSort} align="right" />
                     <SortableHead label="Total Potential" sortKey="totalPotential" sort={auctionsSort.sort} onSort={auctionsSort.onSort} align="right" />
                   </TableRow>
                 </TableHeader>
@@ -2826,6 +2875,7 @@ export default function SalesForecastingDashboard() {
                             <span className="inline-flex items-center gap-1.5">
                               <EditorLink label={a.name} kind="auction" onOpen={openEditor} />
                               {!a.scheduled && <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">TBA</Badge>}
+                              {a.live && <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Live</Badge>}
                               {a.closed && <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Closed</Badge>}
                             </span>
                           </TableCell>
@@ -2847,15 +2897,12 @@ export default function SalesForecastingDashboard() {
                             {a.signedCount} · {fmtMoney(a.signedValue)}
                           </TableCell>
                           <TableCell className="text-right">
-                            {a.closed ? `${a.soldCount} · ${fmtMoney(a.soldActualValue)}` : "—"}
-                          </TableCell>
-                          <TableCell className={`text-right ${a.closed ? (a.soldVarianceValue > 0 ? "text-green-600" : a.soldVarianceValue < 0 ? "text-red-600" : "") : "text-muted-foreground"}`}>
-                            {a.closed ? fmtVariance(a.soldVarianceValue) : "—"}
+                            {a.soldCount > 0 ? `${a.soldCount} · ${fmtMoney(a.soldActualValue)}` : "—"}
                           </TableCell>
                           <TableCell className="text-right font-medium">{fmtMoney(a.totalPotentialValue)}</TableCell>
                         </TableRow>
                         <TableRow>
-                          <TableCell colSpan={11} className="p-0">
+                          <TableCell colSpan={10} className="p-0">
                             <div className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
                               <div className="min-h-0 overflow-hidden">
                                 <div className="border-t bg-muted/30 p-3">

@@ -121,8 +121,10 @@ export interface Auction {
   id: string;
   name: string;
   scheduled: boolean;
-  /** True once the auction's date has actually passed — only closed auctions ever have Actual GTV/sold listings. Auction TBA is never closed (no confirmed date yet). */
+  /** True once the auction is fully reconciled — every lot sold, nothing left pending. Only closed auctions ever get a "Total Potential" that's just their Actualized GTV. */
   closed: boolean;
+  /** True for an auction that already happened recently but isn't fully reconciled yet — a real mix of sold and still-pending lots. Mutually exclusive with `closed`. */
+  live: boolean;
   week: string;
   /** Formatted end date (or expected end date, for the TBA auction). */
   endDate: string;
@@ -804,14 +806,19 @@ function buildAuctions(): Auction[] {
       const avgLot = (8 + aRng() * 22) * 1000;
       const endDateLabel = formatAuctionDate(date);
 
+      const daysSinceEnd = (now.getTime() - date.getTime()) / (24 * 60 * 60 * 1000);
+      // Past auctions aren't instantly fully reconciled — anything within
+      // the last ~10 days is still "live" (a real mix of sold and pending
+      // lots); older than that, it's "closed" (everything's settled).
+      const live = daysSinceEnd >= 0 && daysSinceEnd <= 10;
+      const closed = daysSinceEnd > 10;
+
       auctions.push({
         id: `auction-${counter++}`,
         name,
         scheduled: true,
-        // Closed = the auction date has already passed — deterministic by
-        // real date, not a coin flip, so "closed" always lines up with what
-        // the calendar says.
-        closed: date.getTime() < now.getTime(),
+        closed,
+        live,
         week: endDateLabel,
         endDate: endDateLabel,
         endDateTimestamp: date.getTime(),
@@ -843,6 +850,7 @@ function buildAuctions(): Auction[] {
     name: "Auction TBA",
     scheduled: false,
     closed: false,
+    live: false,
     week: `${tbaEndDateLabel} (expected)`,
     endDate: tbaEndDateLabel,
     endDateTimestamp: tbaExpected.getTime(),
@@ -922,11 +930,15 @@ export function getAuctionListings(auctionId: string): Listing[] {
   const auction = AUCTIONS.find((a) => a.id === auctionId);
   if (!auction) return [];
   const total = auction.submittedCount;
-  // Each auction is either already fully sold (Actualized GTV) or still in
-  // progress (Unsigned/Signed) — never both at once, so a sold auction never
-  // generates "working" (Unsigned) listings and vice versa. Tied to the
-  // auction's real closed flag (its date has passed), not a coin flip.
-  const stages: PipelineStage[] = auction.closed ? ["signedReady", "closed", "closed"] : ["prospect", "working", "signedReady"];
+  // Stage mix follows the auction's real lifecycle:
+  //  - Closed: fully reconciled, every lot sold.
+  //  - Live: recently happened, a genuine mix of sold and still-pending lots.
+  //  - Upcoming (incl. Auction TBA): nothing's sold yet.
+  const stages: PipelineStage[] = auction.closed
+    ? ["closed"]
+    : auction.live
+    ? ["working", "signedReady", "closed"]
+    : ["prospect", "working", "signedReady"];
   return Array.from({ length: total }).map((_, i) => {
     const stage = stages[Math.floor(rng() * stages.length)];
     const rep = REPS[Math.floor(rng() * REPS.length)];
