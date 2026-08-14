@@ -582,6 +582,7 @@ export default function SalesForecastingDashboard() {
   }, [selectedFips, selectedCountyMeta]);
   const mapCardRef = useRef<HTMLDivElement | null>(null);
   const repsCardRef = useRef<HTMLDivElement | null>(null);
+  const byStateCardRef = useRef<HTMLDivElement | null>(null);
   const territoryMapRef = useRef<TerritoryMapHandle | null>(null);
   // Selects a county everywhere that needs it (map highlight + drill-down
   // panel) and, when requested, scrolls the map into view — used by rows
@@ -612,6 +613,15 @@ export default function SalesForecastingDashboard() {
   const [repFilterPopoverOpen, setRepFilterPopoverOpen] = useState(false);
   const [stateFilter, setStateFilter] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // Overview tab's By State breakdown — triggered from inside Research
+  // Filters, scrolls itself to the top of the viewport when opened.
+  const [showStateBreakdown, setShowStateBreakdown] = useState(false);
+  // Up to 5 states picked for side-by-side comparison, and whether the
+  // focused "Compare" view (vs. the full row list) is currently showing.
+  const [compareStates, setCompareStates] = useState<string[]>([]);
+  const [compareMode, setCompareMode] = useState(false);
+  const [addStateOpen, setAddStateOpen] = useState(false);
+  const [addStateQuery, setAddStateQuery] = useState("");
   // Set when someone searches the map (Territories tab) and picks a state —
   // narrows the map and the Reps & Territories table below to that state
   // until cleared. Independent from the Overview tab's own state filter above.
@@ -812,7 +822,12 @@ export default function SalesForecastingDashboard() {
         totals.signedReadyCount += rec.signedReady.count;
         totals.closedCount += rec.closed.count;
 
-        const st = byState.get(rec.stateAbbr) ?? { prospect: 0, prospectAssigned: 0, working: 0, signedReady: 0, closed: 0, priorYearClosed: 0, budget: 0 };
+        const st = byState.get(rec.stateAbbr) ?? {
+          prospect: 0, prospectAssigned: 0, working: 0, signedReady: 0, closed: 0, priorYearClosed: 0, budget: 0,
+          unvaluedProspectCount: 0, unvaluedProspectUncontactedCount: 0,
+          valuedProspectCount: 0, valuedProspectValue: 0,
+          workingCount: 0, signedReadyCount: 0, closedCount: 0,
+        };
         st.prospect += rec.prospect.value;
         if (rec.repId) st.prospectAssigned += rec.prospect.value;
         st.working += rec.working.value;
@@ -820,6 +835,13 @@ export default function SalesForecastingDashboard() {
         st.closed += rec.closed.value;
         st.priorYearClosed += rec.priorYearClosed;
         st.budget += rec.budget;
+        st.unvaluedProspectCount += rec.unvaluedProspect.count;
+        st.unvaluedProspectUncontactedCount += rec.unvaluedProspectUncontactedCount;
+        st.valuedProspectCount += rec.valuedProspect.count;
+        st.valuedProspectValue += rec.valuedProspect.value;
+        st.workingCount += rec.working.count;
+        st.signedReadyCount += rec.signedReady.count;
+        st.closedCount += rec.closed.count;
         byState.set(rec.stateAbbr, st);
 
         if (rec.repId) {
@@ -1181,6 +1203,59 @@ export default function SalesForecastingDashboard() {
   const totalPotential = scaled.closedValue + scaled.signedReadyValue + scaled.workingValue + scaled.valuedProspectValue;
   const totalPotentialCount = scaled.closedCount + scaled.signedReadyCount + scaled.workingCount + scaled.valuedProspectCount;
   const varPct = scaled.priorYearClosed > 0 ? ((scaled.closedValue - scaled.priorYearClosed) / scaled.priorYearClosed) * 100 : 0;
+
+  // Same funnel metrics as the cards above, broken out per state (excludes
+  // AK/HI like everywhere else) — backs the Overview tab's By State table
+  // and the 2-5-state comparison view.
+  const stateRows = Array.from(totalsByState.entries())
+    .filter(([abbr]) => !EXCLUDED_STATES.has(abbr))
+    .map(([abbr, st]) => ({
+      abbr,
+      name: STATE_NAMES[abbr] ?? abbr,
+      unvaluedProspectCount: Math.round(st.unvaluedProspectCount * factor),
+      unvaluedProspectUncontactedCount: Math.round(st.unvaluedProspectUncontactedCount * factor),
+      valuedProspectCount: Math.round(st.valuedProspectCount * factor),
+      valuedProspectValue: Math.round(st.valuedProspectValue * factor),
+      workingCount: Math.round(st.workingCount * factor),
+      workingValue: Math.round(st.working * factor),
+      signedReadyCount: Math.round(st.signedReadyCount * factor),
+      signedReadyValue: Math.round(st.signedReady * factor),
+      closedCount: Math.round(st.closedCount * factor),
+      closedValue: Math.round(st.closed * factor),
+      potentialValue: Math.round((st.valuedProspectValue + st.working + st.signedReady + st.closed) * factor),
+      potentialCount: Math.round(st.valuedProspectCount + st.workingCount + st.signedReadyCount + st.closedCount),
+    }));
+
+  const stateSort = useSort("potentialValue", "desc");
+  const stateAccessors = {
+    name: (r: (typeof stateRows)[number]) => r.name,
+    unvaluedProspect: (r: (typeof stateRows)[number]) => r.unvaluedProspectCount,
+    valuedProspect: (r: (typeof stateRows)[number]) => r.valuedProspectValue,
+    working: (r: (typeof stateRows)[number]) => r.workingValue,
+    signedReady: (r: (typeof stateRows)[number]) => r.signedReadyValue,
+    closed: (r: (typeof stateRows)[number]) => r.closedValue,
+    potentialValue: (r: (typeof stateRows)[number]) => r.potentialValue,
+  };
+  const sortedStateRows = sortRows(stateRows, stateSort.sort, stateAccessors);
+
+  const toggleCompareState = (abbr: string) => {
+    setCompareStates((prev) => (prev.includes(abbr) ? prev.filter((a) => a !== abbr) : prev.length >= 5 ? prev : [...prev, abbr]));
+  };
+  const compareStateRows = compareStates.map((abbr) => stateRows.find((r) => r.abbr === abbr)).filter((r): r is (typeof stateRows)[number] => !!r);
+  const compareMetricRows: { label: string; getValue: (r: (typeof stateRows)[number]) => string }[] = [
+    { label: "New Prospects — Count", getValue: (r) => fmtNum(r.unvaluedProspectCount) },
+    { label: "New Prospects — Uncontacted", getValue: (r) => fmtNum(r.unvaluedProspectUncontactedCount) },
+    { label: "Interested Prospects — Count", getValue: (r) => fmtNum(r.valuedProspectCount) },
+    { label: "Interested Prospects — Estimated Value", getValue: (r) => fmtMoney(r.valuedProspectValue) },
+    { label: "Unsigned Listings — Count", getValue: (r) => fmtNum(r.workingCount) },
+    { label: "Unsigned Listings — Estimated Value", getValue: (r) => fmtMoney(r.workingValue) },
+    { label: "Signed Listings — Count", getValue: (r) => fmtNum(r.signedReadyCount) },
+    { label: "Signed Listings — Estimated Value", getValue: (r) => fmtMoney(r.signedReadyValue) },
+    { label: "Actualized GTV — Value", getValue: (r) => fmtMoney(r.closedValue) },
+    { label: "Actualized GTV — Listings", getValue: (r) => fmtNum(r.closedCount) },
+    { label: "Potential GTV — Value", getValue: (r) => fmtMoney(r.potentialValue) },
+    { label: "Potential GTV — Listings", getValue: (r) => fmtNum(r.potentialCount) },
+  ];
 
   // Per the Overview redesign, only Sold Actuals keeps a progress meter
   // (progress toward the targeted budget goal). Every other funnel phase
@@ -1821,6 +1896,22 @@ export default function SalesForecastingDashboard() {
                       </Popover>
                     </div>
 
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[11px] font-medium text-muted-foreground">View</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setShowStateBreakdown(true);
+                          setTimeout(() => byStateCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                        }}
+                        className={`h-8 justify-start bg-white text-xs font-normal ${showStateBreakdown ? "border-slate-900" : ""}`}
+                      >
+                        <MapPin className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                        By State
+                      </Button>
+                    </div>
+
                     {hasOverviewFilter && (
                       <Button variant="ghost" size="sm" onClick={clearOverviewFilters} className="h-8 text-xs text-muted-foreground">
                         <X className="mr-1 h-3.5 w-3.5" />
@@ -2291,6 +2382,194 @@ export default function SalesForecastingDashboard() {
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* By State — same funnel metrics as the cards above, broken out per state. Opened via Research Filters' "By State" button. */}
+          {showStateBreakdown && (
+          <div ref={byStateCardRef}>
+            <Card className="!py-2">
+              <CardHeader className="!py-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-sm font-semibold">{compareMode ? "Comparing States" : "By State"}</CardTitle>
+                    <CardDescription>
+                      {compareMode
+                        ? "Add or remove states below — up to 5 at a time"
+                        : compareStates.length > 0
+                        ? `${compareStates.length} of 5 selected to compare`
+                        : "Check 2-5 states to compare them side by side"}
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {!compareMode && compareStates.length >= 2 && (
+                      <Button size="sm" onClick={() => setCompareMode(true)} className="h-8 text-xs">
+                        Compare ({compareStates.length})
+                      </Button>
+                    )}
+                    {(compareStates.length > 0 || compareMode) && (
+                      <button
+                        onClick={() => {
+                          setCompareStates([]);
+                          setCompareMode(false);
+                        }}
+                        className="text-xs text-muted-foreground hover:underline"
+                      >
+                        Clear
+                      </button>
+                    )}
+                    <button onClick={() => setShowStateBreakdown(false)} className="rounded-md p-1 text-muted-foreground hover:bg-muted">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </CardHeader>
+
+              {!compareMode ? (
+                <CardContent className="!p-0">
+                  <div className="max-h-96 overflow-y-auto [&>div]:overflow-visible">
+                    <Table>
+                      <TableHeader className="sticky top-0 z-10 bg-background">
+                        <TableRow>
+                          <TableHead className="w-8" />
+                          <SortableHead label="State" sortKey="name" sort={stateSort.sort} onSort={stateSort.onSort} />
+                          <SortableHead label="New Prospects" sortKey="unvaluedProspect" sort={stateSort.sort} onSort={stateSort.onSort} align="right" />
+                          <SortableHead label="Interested Prospects" sortKey="valuedProspect" sort={stateSort.sort} onSort={stateSort.onSort} align="right" />
+                          <SortableHead label="Unsigned Listings" sortKey="working" sort={stateSort.sort} onSort={stateSort.onSort} align="right" />
+                          <SortableHead label="Signed Listings" sortKey="signedReady" sort={stateSort.sort} onSort={stateSort.onSort} align="right" />
+                          <SortableHead label="Actualized GTV" sortKey="closed" sort={stateSort.sort} onSort={stateSort.onSort} align="right" />
+                          <SortableHead label="Potential GTV" sortKey="potentialValue" sort={stateSort.sort} onSort={stateSort.onSort} align="right" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sortedStateRows.map((r) => {
+                          const isSelected = compareStates.includes(r.abbr);
+                          const disabled = !isSelected && compareStates.length >= 5;
+                          return (
+                            <TableRow key={r.abbr} className={isSelected ? "bg-muted/40" : undefined}>
+                              <TableCell>
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  disabled={disabled}
+                                  onChange={() => toggleCompareState(r.abbr)}
+                                  className="h-3.5 w-3.5 accent-slate-900 disabled:opacity-30"
+                                  title={disabled ? "Up to 5 states at a time" : isSelected ? "Remove from comparison" : "Add to comparison"}
+                                />
+                              </TableCell>
+                              <TableCell className="font-medium">{r.name}</TableCell>
+                              <TableCell className="text-right">{fmtNum(r.unvaluedProspectCount)}</TableCell>
+                              <TableCell className="text-right">
+                                {fmtNum(r.valuedProspectCount)} · {fmtMoney(r.valuedProspectValue)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {fmtNum(r.workingCount)} · {fmtMoney(r.workingValue)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {fmtNum(r.signedReadyCount)} · {fmtMoney(r.signedReadyValue)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {fmtMoney(r.closedValue)} · {fmtNum(r.closedCount)} listings
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                {fmtMoney(r.potentialValue)} · {fmtNum(r.potentialCount)} listings
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        {sortedStateRows.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                              {geo ? "No state-level activity in the current scope." : "Waiting on county data to load…"}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              ) : (
+                <CardContent className="space-y-3 !pt-0">
+                  <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+                    {compareStateRows.map((r) => (
+                      <Badge key={r.abbr} variant="outline" className="h-7 gap-1 bg-white pl-2.5 pr-1.5 text-xs font-normal">
+                        {r.name}
+                        <button
+                          onClick={() => toggleCompareState(r.abbr)}
+                          className="ml-0.5 rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                          title={`Remove ${r.name}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                    {compareStates.length < 5 && (
+                      <Popover open={addStateOpen} onOpenChange={setAddStateOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className="h-7 text-xs">
+                            + Add state
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-56 p-0 !z-[2000]" align="start">
+                          <Command shouldFilter={false}>
+                            <CommandInput placeholder="Search states…" value={addStateQuery} onValueChange={setAddStateQuery} />
+                            <CommandList>
+                              <CommandEmpty>No matches found.</CommandEmpty>
+                              {stateRows
+                                .filter((r) => !compareStates.includes(r.abbr) && r.name.toLowerCase().includes(addStateQuery.trim().toLowerCase()))
+                                .slice(0, 8)
+                                .map((r) => (
+                                  <CommandItem
+                                    key={r.abbr}
+                                    onSelect={() => {
+                                      toggleCompareState(r.abbr);
+                                      setAddStateQuery("");
+                                      setAddStateOpen(false);
+                                    }}
+                                  >
+                                    {r.name}
+                                  </CommandItem>
+                                ))}
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
+
+                  {compareStateRows.length >= 2 ? (
+                    <div className="overflow-x-auto rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Metric</TableHead>
+                            {compareStateRows.map((r) => (
+                              <TableHead key={r.abbr} className="text-right">
+                                {r.name}
+                              </TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {compareMetricRows.map((metric) => (
+                            <TableRow key={metric.label}>
+                              <TableCell className="text-muted-foreground">{metric.label}</TableCell>
+                              {compareStateRows.map((r) => (
+                                <TableCell key={r.abbr} className="text-right font-medium">
+                                  {metric.getValue(r)}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <p className="py-8 text-center text-xs text-muted-foreground">Add at least one more state to compare.</p>
+                  )}
+                </CardContent>
+              )}
+            </Card>
+          </div>
           )}
         </TabsContent>
 
