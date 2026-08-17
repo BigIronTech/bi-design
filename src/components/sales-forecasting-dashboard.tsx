@@ -432,11 +432,10 @@ function FunnelPhaseCard({
  * to deep-link into yet, clicking opens a modal explaining what would happen
  * instead of silently doing nothing (or fighting with the row's own onClick,
  * hence the stopPropagation). */
-/** Toggles the Territories tab between its Table (Reps & Territories) and
- * Map (Coverage Map + county detail) views. Rendered twice in the page — a
- * centered standalone row on wider screens, and a compact flex-end copy
- * folded into the Overview/Territories/Auctions tabs row once things start
- * wrapping on narrower ones — see the two call sites. */
+/** Switches the Territories tab between its Table (Reps & Territories) and
+ * Map (Coverage Map + county detail) views. Lives inside each view's own
+ * card header — pass the view that's currently showing, and this renders
+ * the button to switch to the *other* one. */
 function TerritoriesViewToggle({ view, onChange }: { view: "table" | "map"; onChange: (v: "table" | "map") => void }) {
   return view === "table" ? (
     <button
@@ -1851,11 +1850,6 @@ export default function SalesForecastingDashboard() {
               <TabsTrigger value="territories">Territories</TabsTrigger>
               <TabsTrigger value="auctions">Auctions</TabsTrigger>
             </TabsList>
-            {activeTab === "territories" && (
-              <div className="flex md:hidden">
-                <TerritoriesViewToggle view={territoriesView} onChange={setTerritoriesView} />
-              </div>
-            )}
           </div>
         </div>
 
@@ -2701,34 +2695,20 @@ export default function SalesForecastingDashboard() {
 
         {/* ----------------------------- TERRITORIES ----------------------------- */}
         <TabsContent value="territories" className="space-y-4">
-          <div className="hidden justify-center md:flex">
-            <TerritoriesViewToggle view={territoriesView} onChange={setTerritoriesView} />
-          </div>
-
           {territoriesView === "map" && (
           <div ref={mapCardRef} className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {/* LEFT: map */}
             <Card className="!py-2">
-              <CardHeader className="!py-2 space-y-2">
+              <CardHeader className="!py-2 !gap-1">
                 <div className="flex flex-row items-start justify-between gap-4">
                   <div>
                     <CardTitle className="text-sm font-semibold">Coverage Map</CardTitle>
                     <CardDescription>Click a county for its full pipeline breakdown</CardDescription>
                   </div>
-                  <button
-                    onClick={() => {
-                      territoryMapRef.current?.resetView();
-                      setSelectedFips(null);
-                      setDisplayFips(null);
-                      setDisplayCountyMeta(null);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    Clear
-                  </button>
+                  <TerritoriesViewToggle view="map" onChange={setTerritoriesView} />
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                   <Popover open={mapSearchOpen} onOpenChange={setMapSearchOpen}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" role="combobox" className="h-8 w-72 justify-start bg-white text-xs font-normal">
@@ -2820,6 +2800,19 @@ export default function SalesForecastingDashboard() {
                       </button>
                     </Badge>
                   )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      territoryMapRef.current?.resetView();
+                      setSelectedFips(null);
+                      setDisplayFips(null);
+                      setDisplayCountyMeta(null);
+                    }}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Clear
+                  </button>
                 </div>
               </CardHeader>
               <CardContent className="!py-2">
@@ -3038,10 +3031,15 @@ export default function SalesForecastingDashboard() {
           <div ref={repsCardRef}>
             <Card className="!py-2">
               <CardHeader className="!py-2">
-                <CardTitle className="text-sm font-semibold">Reps & Territories</CardTitle>
-                <CardDescription>
-                  Territory Managers and Independent Sales Reps, ranked by total pipeline for {TIMEFRAMES.find((t) => t.id === timeframe)!.label.toLowerCase()} · click a rep for their full breakdown
-                </CardDescription>
+                <div className="flex flex-row items-start justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-sm font-semibold">Reps & Territories</CardTitle>
+                    <CardDescription>
+                      Territory Managers and Independent Sales Reps, ranked by total pipeline for {TIMEFRAMES.find((t) => t.id === timeframe)!.label.toLowerCase()} · click a rep for their full breakdown
+                    </CardDescription>
+                  </div>
+                  <TerritoriesViewToggle view="table" onChange={setTerritoriesView} />
+                </div>
               </CardHeader>
               <CardContent className="!p-0">
                 <div className="border-b px-4 py-2.5">
