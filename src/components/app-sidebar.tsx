@@ -91,9 +91,9 @@ const navItems = [
       },
       { id: 'find-a-rep', label: 'Find My Sales Rep', to: '/find-a-rep' }, // ← NEW
       {
-        id: 'sales-forecasting',
-        label: 'Sales Forecasting',
-        to: '/sales-forecasting',
+        id: 'sales-funnel-insights',
+        label: 'Sales Funnel Insights',
+        to: '/sales-funnel-insights',
       }, // ← NEW
     ],
   },

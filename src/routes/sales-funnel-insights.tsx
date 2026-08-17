@@ -1,6 +1,6 @@
 import React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import SalesForecastingDashboard from '@/components/sales-forecasting-dashboard'
+import SalesFunnelInsightsDashboard from '@/components/sales-funnel-insights-dashboard'
 import { AppSidebar } from '@/components/app-sidebar'
 import {
   Breadcrumb,
@@ -19,12 +19,12 @@ import {
 } from '@/components/ui/sidebar'
 import { ButtonToggle } from '@/components/button-toggle'
 
-export const Route = createFileRoute('/sales-forecasting')({
-  component: SalesForecastingPage,
+export const Route = createFileRoute('/sales-funnel-insights')({
+  component: SalesFunnelInsightsPage,
 })
 
 // Wrapper component to handle sidebar state
-function SalesForecastingWrapper({ children }: { children: React.ReactNode }) {
+function SalesFunnelInsightsWrapper({ children }: { children: React.ReactNode }) {
   const sidebar = useSidebar()
 
   // Auto-close sidebar on mount, matching the other dashboard pages
@@ -52,7 +52,7 @@ function SalesForecastingWrapper({ children }: { children: React.ReactNode }) {
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
-                <BreadcrumbPage>Sales Forecasting</BreadcrumbPage>
+                <BreadcrumbPage>Sales Funnel Insights</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -70,15 +70,15 @@ function SalesForecastingWrapper({ children }: { children: React.ReactNode }) {
   )
 }
 
-function SalesForecastingPage() {
+function SalesFunnelInsightsPage() {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SalesForecastingWrapper>
+      <SalesFunnelInsightsWrapper>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-[#eceae5]">
-          <SalesForecastingDashboard />
+          <SalesFunnelInsightsDashboard />
         </main>
-      </SalesForecastingWrapper>
+      </SalesFunnelInsightsWrapper>
     </SidebarProvider>
   )
 }

@@ -545,7 +545,7 @@ function getTimeframeTitle(timeframe: TimeframeId): string {
   return `Sales Funnel Insights for ${year}`;
 }
 
-export default function SalesForecastingDashboard() {
+export default function SalesFunnelInsightsDashboard() {
   const [timeframe, setTimeframe] = useState<TimeframeId>("month");
   // Page-wide filter: narrows every listing/auction shown (Overview,
   // Territories, Auctions) to just this auction type.
