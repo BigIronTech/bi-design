@@ -28,7 +28,7 @@ export interface Rep {
   parentId: string | null;
 }
 
-export type RegionId = "west" | "east";
+export type RegionId = "mountainWest" | "mountain" | "southCentral" | "centralPlains" | "midwest" | "open";
 
 export interface StageAmount {
   count: number;
@@ -199,18 +199,58 @@ export const STATE_NAMES: Record<string, string> = {
   WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
 };
 
-const WEST = new Set([
-  "WA","OR","CA","NV","ID","MT","WY","UT","CO","AZ","NM","AK","HI",
-  "ND","SD","NE","KS","OK","TX","MN","IA","MO","AR","LA",
-]);
+// This dashboard's real operating footprint — a focused Mountain/Plains/
+// Midwest territory, not the whole continental US. Every state below maps to
+// exactly one region, except Kentucky, which straddles Midwest/Open and is
+// resolved per-county by geography (see regionForCounty). Any state not
+// listed here is outside the footprint entirely — the dashboard excludes it
+// (see EXCLUDED_STATES in the UI layer), same treatment as AK/HI before.
+const STATE_TO_REGION: Record<string, RegionId> = {
+  UT: "mountainWest", CO: "mountainWest",
+  ID: "mountain", MT: "mountain", WY: "mountain",
+  OK: "southCentral", TX: "southCentral", MO: "southCentral", AR: "southCentral", LA: "southCentral",
+  SD: "centralPlains", NE: "centralPlains", KS: "centralPlains",
+  IA: "midwest", IL: "midwest", IN: "midwest",
+  ND: "open", MN: "open", WI: "open", MI: "open", OH: "open",
+};
 
+// Kentucky splits between Midwest (west of this line) and Open (east of it)
+// — there's no single state-level answer for KY, so this is resolved by
+// county centroid longitude instead. -85.7 sits roughly on Louisville's
+// meridian, a reasonable midpoint between KY's Mississippi-River western tip
+// and its Appalachian eastern tip.
+const KENTUCKY_SPLIT_LONGITUDE = -85.7;
+
+/** State-only region lookup — exact for every footprint state except
+ * Kentucky (which can't be resolved without county geometry; defaults to
+ * Midwest, the larger of its two halves). Prefer regionForCounty when a
+ * county's centroid is available — that's what actually renders on the map
+ * and is what getCountyRecord uses once primeCountyAssignments has run. */
 export function regionForState(abbr: string): RegionId {
-  return WEST.has(abbr) ? "west" : "east";
+  return STATE_TO_REGION[abbr] ?? "open";
 }
 
+/** County-aware region lookup — same as regionForState for every state
+ * except Kentucky, which this actually splits by real geography using the
+ * county's centroid longitude. */
+function regionForCounty(stateAbbr: string, centroidLng: number): RegionId {
+  if (stateAbbr === "KY") return centroidLng <= KENTUCKY_SPLIT_LONGITUDE ? "midwest" : "open";
+  return regionForState(stateAbbr);
+}
+
+// Populated once by primeCountyAssignments (which has real county centroids)
+// — getCountyRecord consults this first so Kentucky's per-county split is
+// consistent everywhere, falling back to the state-only approximation only
+// for a county requested before priming has run.
+const countyRegionCache = new Map<string, RegionId>();
+
 export const REGIONS: { id: RegionId; name: string }[] = [
-  { id: "west", name: "West Region" },
-  { id: "east", name: "East Region" },
+  { id: "mountainWest", name: "Mountain West" },
+  { id: "mountain", name: "Mountain" },
+  { id: "southCentral", name: "South Central" },
+  { id: "centralPlains", name: "Central Plains" },
+  { id: "midwest", name: "Midwest" },
+  { id: "open", name: "Open" },
 ];
 
 /* --------------------------------- rep tree -------------------------------- */
@@ -228,21 +268,40 @@ function buildReps(): Rep[] {
   const rng = mulberry32(7);
   const reps: Rep[] = [];
 
-  // Field-rep headcount is proportional to each region's real county count
-  // (West ~48%, East ~52% of all US counties with this split) so coverage
-  // density ends up roughly even across both. ~145 people total.
+  // District counts are a rough proportional split of the footprint — South
+  // Central (anchored by Texas) and Open (5 states) carry the most territory,
+  // Mountain West and Central Plains the least. ~170 field reps total.
   const REGION_CONFIG: Record<RegionId, { districts: number; fieldRepsPerDistrict: number }> = {
-    west: { districts: 6, fieldRepsPerDistrict: 10 }, // 60 field reps
-    east: { districts: 7, fieldRepsPerDistrict: 10 }, // 70 field reps
+    mountainWest: { districts: 2, fieldRepsPerDistrict: 10 },
+    mountain: { districts: 2, fieldRepsPerDistrict: 10 },
+    southCentral: { districts: 4, fieldRepsPerDistrict: 10 },
+    centralPlains: { districts: 2, fieldRepsPerDistrict: 10 },
+    midwest: { districts: 3, fieldRepsPerDistrict: 10 },
+    open: { districts: 4, fieldRepsPerDistrict: 10 },
+  };
+
+  // Real, named Regional Managers for every region except Open, which is
+  // currently unstaffed at the RM level (districts and field reps still
+  // exist and work it — there's just no one over them yet).
+  const REGIONAL_MANAGERS: Partial<Record<RegionId, string>> = {
+    mountainWest: "Patrick Baldwin",
+    mountain: "Travis Hakert",
+    southCentral: "Kurt Campbell",
+    centralPlains: "Ryan Harbur",
+    midwest: "Cody Holst",
   };
 
   REGIONS.forEach((region) => {
-    const rm: Rep = { id: `rm-${region.id}`, name: nameFor(rng), type: "regional", regionId: region.id, parentId: null };
-    reps.push(rm);
+    const rmName = REGIONAL_MANAGERS[region.id];
+    const rm: Rep | null = rmName ? { id: `rm-${region.id}`, name: rmName, type: "regional", regionId: region.id, parentId: null } : null;
+    if (rm) reps.push(rm);
     const { districts, fieldRepsPerDistrict } = REGION_CONFIG[region.id];
     for (let d = 0; d < districts; d++) {
       const dmId = `dm-${region.id}-${d}`;
-      reps.push({ id: dmId, name: nameFor(rng), type: "district", regionId: region.id, parentId: rm.id });
+      // Open has no RM yet, so its DMs report to no one (parentId null) —
+      // still real districts with real field reps, just without regional
+      // leadership above them.
+      reps.push({ id: dmId, name: nameFor(rng), type: "district", regionId: region.id, parentId: rm ? rm.id : null });
       // Roughly 2/3 Territory Managers, 1/3 Independent Sales Reps per district.
       const territoryCount = Math.round(fieldRepsPerDistrict * 0.64);
       const independentCount = fieldRepsPerDistrict - territoryCount;
@@ -430,9 +489,10 @@ export function primeCountyAssignments(geo: { features: any[] }) {
   const centroidByFips = new Map<string, LngLat>();
   for (const feature of geo.features) {
     const { fips, stateAbbr } = fipsAndStateFromFeature(feature);
-    const region = regionForState(stateAbbr);
     const centroid = centroidOfFeature(feature) ?? [0, 0];
+    const region = regionForCounty(stateAbbr, centroid[0]);
     centroidByFips.set(fips, centroid);
+    countyRegionCache.set(fips, region);
     const list = byRegion.get(region) ?? [];
     list.push({ fips, centroid });
     byRegion.set(region, list);
@@ -556,7 +616,11 @@ export function getCountyRecord(fips: string, rawName: string): CountyRecord {
 
   const stateFips = fips.slice(0, 2);
   const stateAbbr = FIPS_TO_STATE[stateFips] ?? "US";
-  const regionId = regionForState(stateAbbr);
+  // Prefer the real, geometry-based region computed during
+  // primeCountyAssignments (the only way to get Kentucky's split right) —
+  // falls back to the state-only approximation for a county requested
+  // before that's run.
+  const regionId = countyRegionCache.get(fips) ?? regionForState(stateAbbr);
   const rng = mulberry32(hashStr(fips));
 
   let repId: string | null;
@@ -582,7 +646,7 @@ export function getCountyRecord(fips: string, rawName: string): CountyRecord {
   // only get one ~18% of the time — otherwise every gray (no-rep) county
   // would show a prospect signal, which is the opposite of "sprinkled."
   const prospectAmt = rep ? mk(0.9, 4) : rng() < 0.18 ? mk(0.9, 4) : { count: 0, value: 0 };
-  const workingAmt = rep ? mk(0.6, 3) : { count: 0, value: 0 };
+  const workingAmt = rep ? mk(0.6, 2) : { count: 0, value: 0 };
   const signedReadyAmt = rep ? mk(0.75, 2) : { count: 0, value: 0 };
   const closedAmt = rep ? mk(1.1, 3) : { count: 0, value: 0 };
 
@@ -899,8 +963,14 @@ export function auctionById(id: string | null | undefined): Auction | undefined 
  */
 export function getAuctionRegionShare(auctionId: string, regionId: RegionId): number {
   const rng = mulberry32(hashStr(auctionId + "-region-split"));
-  const westShare = 0.3 + rng() * 0.4; // 30-70%
-  return regionId === "west" ? westShare : 1 - westShare;
+  const weights: Partial<Record<RegionId, number>> = {};
+  let total = 0;
+  for (const r of REGIONS) {
+    const w = 0.3 + rng() * 1.0;
+    weights[r.id] = w;
+    total += w;
+  }
+  return (weights[regionId] ?? 0) / total;
 }
 
 export function getAuctionDistrictShare(auctionId: string, districtId: string): number {

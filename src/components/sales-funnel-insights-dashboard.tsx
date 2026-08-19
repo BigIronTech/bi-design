@@ -33,12 +33,20 @@ import {
   RegionId, PipelineStage, FunnelPhase, CountyRecord, AuctionType,
 } from "@/data/mockSalesForecastData";
 
-// Alaska and Hawaii are excluded from this dashboard entirely — no coverage
-// there, so they're filtered out of the map, county/state search, and every
-// aggregation as soon as county data loads. "US" is also excluded — it's a
-// fallback stateAbbr for any county whose FIPS prefix isn't recognized,
-// never a real state to show.
-const EXCLUDED_STATES = new Set(["AK", "HI", "US"]);
+// This dashboard's real operating footprint is a focused Mountain/Plains/
+// Midwest territory (Mountain West, Mountain, South Central, Central
+// Plains, Midwest, and Open regions) — not the whole continental US. Every
+// state outside that footprint is excluded from the map, county/state
+// search, and every aggregation as soon as county data loads, same
+// treatment AK/HI always had. "US" is also excluded — it's a fallback
+// stateAbbr for any county whose FIPS prefix isn't recognized, never a real
+// state to show. Kentucky is NOT excluded — it straddles Midwest/Open and
+// is split by county geography (see regionForCounty in the data layer).
+const EXCLUDED_STATES = new Set([
+  "AL", "AK", "AZ", "CA", "CT", "DE", "DC", "FL", "GA", "HI", "ME", "MD", "MA",
+  "MS", "NV", "NH", "NJ", "NM", "NY", "NC", "OR", "PA", "RI", "SC", "TN", "VT",
+  "VA", "WA", "WV", "US",
+]);
 
 const fmtMoney = (n: number) => {
   if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
@@ -48,6 +56,9 @@ const fmtMoney = (n: number) => {
 const fmtPct = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
 const fmtNum = (n: number) => n.toLocaleString();
 const fmtVariance = (n: number) => `${n > 0 ? "+" : n < 0 ? "-" : ""}${fmtMoney(Math.abs(n))}`;
+// Whole-dollar, comma-separated, no K/M abbreviation — used specifically in
+// the By State section, where exact figures read better than rounded ones.
+const fmtMoneyWhole = (n: number) => `$${Math.round(n).toLocaleString()}`;
 const truncate30 = (s: string) => (s.length > 30 ? `${s.slice(0, 30)}…` : s);
 
 /** Territory/District/DM/RM for a listing's assigned rep, following the same
@@ -1270,14 +1281,14 @@ export default function SalesFunnelInsightsDashboard() {
     { label: "New Prospects — Count", getValue: (r) => fmtNum(r.unvaluedProspectCount) },
     { label: "New Prospects — Uncontacted", getValue: (r) => fmtNum(r.unvaluedProspectUncontactedCount) },
     { label: "Interested Prospects — Count", getValue: (r) => fmtNum(r.valuedProspectCount) },
-    { label: "Interested Prospects — Estimated Value", getValue: (r) => fmtMoney(r.valuedProspectValue) },
+    { label: "Interested Prospects — Estimated Value", getValue: (r) => fmtMoneyWhole(r.valuedProspectValue) },
     { label: "Unsigned Listings — Count", getValue: (r) => fmtNum(r.workingCount) },
-    { label: "Unsigned Listings — Estimated Value", getValue: (r) => fmtMoney(r.workingValue) },
+    { label: "Unsigned Listings — Estimated Value", getValue: (r) => fmtMoneyWhole(r.workingValue) },
     { label: "Signed Listings — Count", getValue: (r) => fmtNum(r.signedReadyCount) },
-    { label: "Signed Listings — Estimated Value", getValue: (r) => fmtMoney(r.signedReadyValue) },
-    { label: "Actualized GTV — Value", getValue: (r) => fmtMoney(r.closedValue) },
+    { label: "Signed Listings — Estimated Value", getValue: (r) => fmtMoneyWhole(r.signedReadyValue) },
+    { label: "Actualized GTV — Value", getValue: (r) => fmtMoneyWhole(r.closedValue) },
     { label: "Actualized GTV — Listings", getValue: (r) => fmtNum(r.closedCount) },
-    { label: "Potential GTV — Value", getValue: (r) => fmtMoney(r.potentialValue) },
+    { label: "Potential GTV — Value", getValue: (r) => fmtMoneyWhole(r.potentialValue) },
     { label: "Potential GTV — Listings", getValue: (r) => fmtNum(r.potentialCount) },
   ];
 
@@ -1705,7 +1716,7 @@ export default function SalesFunnelInsightsDashboard() {
               <SelectTrigger className="h-8 w-[140px] bg-white text-xs">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="!z-[2000]">
                 {TIMEFRAMES.map((t) => (
                   <SelectItem key={t.id} value={t.id}>
                     {t.label}
@@ -1742,7 +1753,7 @@ export default function SalesFunnelInsightsDashboard() {
               <SelectTrigger className="h-8 w-[200px] bg-white text-xs">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="!z-[2000]">
                 <SelectItem value="all">All Auction Types</SelectItem>
                 {AUCTION_TYPES.map((t) => (
                   <SelectItem key={t} value={t}>
@@ -1758,7 +1769,7 @@ export default function SalesFunnelInsightsDashboard() {
               <SelectTrigger className="h-8 w-[200px] bg-white text-xs">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="!z-[2000]">
                 <SelectItem value="forecaster">All locations</SelectItem>
                 <SelectItem value="regional">Regional</SelectItem>
                 <SelectItem value="district">District</SelectItem>
@@ -1770,7 +1781,7 @@ export default function SalesFunnelInsightsDashboard() {
                 <SelectTrigger className="h-8 w-[200px] bg-white text-xs">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="!z-[2000]">
                   {teamOptions.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
                       {o.label}
@@ -1785,7 +1796,7 @@ export default function SalesFunnelInsightsDashboard() {
                 <SelectTrigger className="h-8 w-[200px] bg-white text-xs">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="!z-[2000]">
                   <SelectItem value="all">All Districts</SelectItem>
                   {regionDistrictOptions.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
@@ -1801,7 +1812,7 @@ export default function SalesFunnelInsightsDashboard() {
                 <SelectTrigger className="h-8 w-[200px] bg-white text-xs">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="!z-[2000]">
                   <SelectItem value="all">All Territories</SelectItem>
                   {districtTerritoryOptions.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
@@ -1898,7 +1909,7 @@ export default function SalesFunnelInsightsDashboard() {
                         <SelectTrigger className="!h-8 w-32 !border-input bg-white text-xs">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="!z-[2000]">
                           <SelectItem value="all">All states</SelectItem>
                           {allStates.map((st) => (
                             <SelectItem key={st} value={st}>
@@ -2387,19 +2398,19 @@ export default function SalesFunnelInsightsDashboard() {
                               <TableCell className="font-medium">{r.name}</TableCell>
                               <TableCell className="text-right">{fmtNum(r.unvaluedProspectCount)}</TableCell>
                               <TableCell className="text-right">
-                                {fmtNum(r.valuedProspectCount)} · {fmtMoney(r.valuedProspectValue)}
+                                {fmtNum(r.valuedProspectCount)} · {fmtMoneyWhole(r.valuedProspectValue)}
                               </TableCell>
                               <TableCell className="text-right">
-                                {fmtNum(r.workingCount)} · {fmtMoney(r.workingValue)}
+                                {fmtNum(r.workingCount)} · {fmtMoneyWhole(r.workingValue)}
                               </TableCell>
                               <TableCell className="text-right">
-                                {fmtNum(r.signedReadyCount)} · {fmtMoney(r.signedReadyValue)}
+                                {fmtNum(r.signedReadyCount)} · {fmtMoneyWhole(r.signedReadyValue)}
                               </TableCell>
                               <TableCell className="text-right">
-                                {fmtMoney(r.closedValue)} · {fmtNum(r.closedCount)} listings
+                                {fmtMoneyWhole(r.closedValue)} · {fmtNum(r.closedCount)} listings
                               </TableCell>
                               <TableCell className="text-right font-medium">
-                                {fmtMoney(r.potentialValue)} · {fmtNum(r.potentialCount)} listings
+                                {fmtMoneyWhole(r.potentialValue)} · {fmtNum(r.potentialCount)} listings
                               </TableCell>
                             </TableRow>
                           );
